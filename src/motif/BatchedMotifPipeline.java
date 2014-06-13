@@ -8,9 +8,10 @@ import java.util.ArrayList;
 
 import org.ggf.drmaa.DrmaaException;
 
+import pipeline.Scheduler;
+
 import nextgen.core.job.Job;
 import nextgen.core.job.JobUtils;
-import nextgen.core.pipeline.Scheduler;
 
 
 import broad.core.parser.CommandLineParser;

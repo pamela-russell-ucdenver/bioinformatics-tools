@@ -5,9 +5,10 @@ package motif;
 
 import java.io.IOException;
 
+import pipeline.Scheduler;
+
 import nextgen.core.job.Job;
 import nextgen.core.job.LSFJob;
-import nextgen.core.pipeline.Scheduler;
 
 
 /**

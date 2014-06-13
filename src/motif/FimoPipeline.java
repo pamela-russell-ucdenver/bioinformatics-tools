@@ -7,10 +7,11 @@ import java.io.IOException;
 
 
 import nextgen.core.job.Job;
-import nextgen.core.pipeline.Scheduler;
 
 import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
+
+import pipeline.Scheduler;
 
 import broad.core.parser.CommandLineParser;
 

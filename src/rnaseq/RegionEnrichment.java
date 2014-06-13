@@ -15,6 +15,8 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
 
+import pipeline.Scheduler;
+
 import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
@@ -27,7 +29,6 @@ import nextgen.core.model.AlignmentModel;
 import nextgen.core.normalize.CrossSampleTranscriptAverageNormalization;
 import nextgen.core.normalize.NormalizationUtils;
 import nextgen.core.normalize.TranscriptAverageNormalization;
-import nextgen.core.pipeline.Scheduler;
 
 /**
  * @author prussell

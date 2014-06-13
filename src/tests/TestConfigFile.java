@@ -4,10 +4,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import pipeline.ConfigFile;
+import pipeline.ConfigFileOption;
+import pipeline.ConfigFileSection;
+
 import broad.core.parser.CommandLineParser;
-import nextgen.core.pipeline.ConfigFile;
-import nextgen.core.pipeline.ConfigFileOption;
-import nextgen.core.pipeline.ConfigFileSection;
 
 /**
  * @author prussell

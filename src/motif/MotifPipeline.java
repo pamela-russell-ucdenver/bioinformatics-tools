@@ -15,6 +15,8 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
 
+import pipeline.Scheduler;
+
 import annotation.WindowWriter;
 import bed.BedFileCollapseOverlappers;
 import bed.BedFileFilter;
@@ -27,7 +29,6 @@ import nextgen.core.annotation.Gene;
 import nextgen.core.job.Job;
 import nextgen.core.job.JobUtils;
 import nextgen.core.job.LSFJob;
-import nextgen.core.pipeline.Scheduler;
 import nextgen.core.programs.FastaAnnotationExtractor;
 
 /**
