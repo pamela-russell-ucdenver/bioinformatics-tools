@@ -71,12 +71,12 @@ public class WigTools {
 	 * @param offset Offset along direction of transcription (can be negative)
 	 * @return Shifted values by chromosome
 	 */
-	private Map<String, Map<Integer,Double>> shiftWig(int offset) {
+	private Map<String, TreeMap<Integer,Double>> shiftWig(int offset) {
 		logger.info("Getting track with all values shifted along direction of transcription...");
-		Map<String, Map<Integer, Double>> rtrn = new TreeMap<String, Map<Integer, Double>>();
+		Map<String, TreeMap<Integer, Double>> rtrn = new TreeMap<String, TreeMap<Integer, Double>>();
 		for(String chr : wigData.keySet()) {
 			logger.info(chr);
-			Map<Integer, Double> shiftedCountsThisChr = new TreeMap<Integer, Double>();
+			TreeMap<Integer, Double> shiftedCountsThisChr = new TreeMap<Integer, Double>();
 			for(Integer origPos : wigData.get(chr).keySet()) {
 				try {
 					Integer shiftedPos = Integer.valueOf(transcribedRegions.shiftPosition(chr, origPos.intValue(), offset));
@@ -101,12 +101,12 @@ public class WigTools {
 	 * @throws IOException
 	 */
 	private void writeShiftedWig(String outFile, int offset) throws IOException {
-		Map<String, Map<Integer, Double>> shiftedWig = shiftWig(offset);
+		Map<String, TreeMap<Integer, Double>> shiftedWig = shiftWig(offset);
 		FileWriter w = new FileWriter(outFile);
 		logger.info("Writing shifted wig file to " + outFile + "...");
 		for(String chr : shiftedWig.keySet()) {
 			logger.info(chr);
-			WigWriter.write(w, chr, shiftedWig.get(chr));
+			WigWriter.write(w, chr, shiftedWig.get(chr), false);
 		}
 		w.close();
 		logger.info("Done writing shifted file.");
@@ -120,14 +120,14 @@ public class WigTools {
 	 * @return Map of nucleotide to chromosome-based count data
 	 * @throws IOException 
 	 */
-	private Map<String, Map<String, Map<Integer, Double>>> getTracksByNucleotide() throws IOException {
+	private Map<String, Map<String, TreeMap<Integer, Double>>> getTracksByNucleotide() throws IOException {
 		logger.info("Getting separate tracks for each nucleotide...");
 		// Initialize data structure
-		Map<String, Map<String, Map<Integer, Double>>> rtrn = new TreeMap<String, Map<String, Map<Integer, Double>>>();
+		Map<String, Map<String, TreeMap<Integer, Double>>> rtrn = new TreeMap<String, Map<String, TreeMap<Integer, Double>>>();
 		for(int i=0; i<bases.length; i++) {
-			Map<String, Map<Integer, Double>> trackThisBase = new TreeMap<String, Map<Integer, Double>>();
+			Map<String, TreeMap<Integer, Double>> trackThisBase = new TreeMap<String, TreeMap<Integer, Double>>();
 			for(String chr : wigData.keySet()) {
-				Map<Integer, Double> trackThisChr = new TreeMap<Integer, Double>();
+				TreeMap<Integer, Double> trackThisChr = new TreeMap<Integer, Double>();
 				trackThisBase.put(chr, trackThisChr);
 			}
 			rtrn.put(bases[i], trackThisBase);
@@ -153,13 +153,13 @@ public class WigTools {
 	 */
 	private void writeTracksByNuceotide(String outFilePrefix) throws IOException{
 		logger.info("Writing separate nucleotide tracks...");
-		Map<String, Map<String, Map<Integer, Double>>> tracksByNuc = getTracksByNucleotide();
+		Map<String, Map<String, TreeMap<Integer, Double>>> tracksByNuc = getTracksByNucleotide();
 		for(int i=0; i<bases.length; i++) {
 			String base = bases[i];
 			String outFile = outFilePrefix + "_" + base + ".wig";
 			FileWriter w = new FileWriter(outFile);
 			for(String chr : tracksByNuc.get(base).keySet()) {
-				WigWriter.write(w, chr, tracksByNuc.get(base).get(chr));
+				WigWriter.write(w, chr, tracksByNuc.get(base).get(chr), false);
 			}
 			w.close();
 		}
@@ -187,14 +187,14 @@ public class WigTools {
 		for(String chr : allChrs) {
 			logger.info(chr);
 			if(!vals1.containsKey(chr)) {
-				WigWriter.write(w, chr, vals2.get(chr));
+				WigWriter.write(w, chr, vals2.get(chr), false);
 				continue;
 			}
 			if(!vals2.containsKey(chr)) {
-				WigWriter.write(w, chr, vals1.get(chr));
+				WigWriter.write(w, chr, vals1.get(chr), false);
 				continue;
 			}
-			Map<Integer, Double> valsThisChr = new TreeMap<Integer, Double>();
+			TreeMap<Integer, Double> valsThisChr = new TreeMap<Integer, Double>();
 			Collection<Integer> positions = new TreeSet<Integer>();
 			positions.addAll(vals1.get(chr).keySet());
 			positions.addAll(vals2.get(chr).keySet());
@@ -208,7 +208,7 @@ public class WigTools {
 				}
 				valsThisChr.put(pos, Double.valueOf(val));
 			}
-			WigWriter.write(w, chr, valsThisChr);
+			WigWriter.write(w, chr, valsThisChr, false);
 		}
 		w.close();
 		logger.info("Done writing merged wig file.");
@@ -367,10 +367,10 @@ public class WigTools {
 		for(String chr : genes.keySet()) {
 			logger.info(chr);
 			// Initialize the four tracks
-			Map<Integer, Double> transcribedA = new TreeMap<Integer, Double>();
-			Map<Integer, Double> transcribedC = new TreeMap<Integer, Double>();
-			Map<Integer, Double> transcribedG = new TreeMap<Integer, Double>();
-			Map<Integer, Double> transcribedT = new TreeMap<Integer, Double>();
+			TreeMap<Integer, Double> transcribedA = new TreeMap<Integer, Double>();
+			TreeMap<Integer, Double> transcribedC = new TreeMap<Integer, Double>();
+			TreeMap<Integer, Double> transcribedG = new TreeMap<Integer, Double>();
+			TreeMap<Integer, Double> transcribedT = new TreeMap<Integer, Double>();
 			// First list all postions contained in any exon
 			Collection<Integer> allPositions = new TreeSet<Integer>();
 			for(Gene gene : genes.get(chr)) {
@@ -416,10 +416,10 @@ public class WigTools {
 				}
 			}
 			// Write tracks
-			WigWriter.write(writerA, chr, transcribedA);
-			WigWriter.write(writerC, chr, transcribedC);
-			WigWriter.write(writerG, chr, transcribedG);
-			WigWriter.write(writerT, chr, transcribedT);
+			WigWriter.write(writerA, chr, transcribedA, false);
+			WigWriter.write(writerC, chr, transcribedC, false);
+			WigWriter.write(writerG, chr, transcribedG, false);
+			WigWriter.write(writerT, chr, transcribedT, false);
 		}
 		writerA.close();
 		writerC.close();
