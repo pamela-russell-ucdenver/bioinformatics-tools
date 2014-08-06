@@ -3,6 +3,8 @@
  */
 package bam;
 
+import general.CommandLineParser;
+
 import java.io.File;
 
 import org.apache.log4j.Logger;
@@ -11,7 +13,6 @@ import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMFormatException;
 import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMRecordIterator;
-import broad.core.parser.CommandLineParser;
 
 
 

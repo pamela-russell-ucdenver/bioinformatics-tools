@@ -1,11 +1,12 @@
 package sequence;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
 
-import broad.core.parser.CommandLineParser;
 import broad.core.sequence.FastaSequenceIO;
 import broad.core.sequence.Sequence;
 

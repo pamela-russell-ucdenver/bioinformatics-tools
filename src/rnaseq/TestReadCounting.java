@@ -1,5 +1,7 @@
 package rnaseq;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.io.IOException;
 
@@ -7,7 +9,6 @@ import nextgen.core.annotation.Gene;
 import nextgen.core.coordinatesystem.GenomicSpace;
 import nextgen.core.coordinatesystem.TranscriptomeSpace;
 import nextgen.core.model.AlignmentModel;
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 /**

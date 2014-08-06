@@ -5,10 +5,14 @@ package motif;
 
 import java.io.IOException;
 
+import org.ggf.drmaa.DrmaaException;
+import org.ggf.drmaa.Session;
+
+import pipeline.Job;
+import pipeline.LSFJob;
+import pipeline.OGSJob;
 import pipeline.Scheduler;
 
-import nextgen.core.job.Job;
-import nextgen.core.job.LSFJob;
 
 
 /**
@@ -115,11 +119,13 @@ public class DremeJob {
 	 * Submit the job to LSF
 	 * @param queue Queue name
 	 * @param memoryRequest Memory request in gigabytes
+	 * @param drmaaSession Active DRMAA session or null if not using OGS
 	 * @return Job ID
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	public Job submitJob(String queue, int memoryRequest) throws IOException, InterruptedException {
+	public Job submitJob(String queue, int memoryRequest, Session drmaaSession) throws IOException, InterruptedException, DrmaaException {
 		lsfJobID = description + "_" + System.currentTimeMillis();
 		String bsubOut = outDir + "/" + lsfJobID + ".bsub";
 		String command = "python " + executable + " ";
@@ -134,6 +140,10 @@ public class DremeJob {
 			LSFJob job = new LSFJob(Runtime.getRuntime(), lsfJobID, command, bsubOut, queue, memoryRequest);
 			job.submit();
 			return job;
+		case OGS:
+			OGSJob ogsjob = new OGSJob(drmaaSession, command);
+			ogsjob.submit();
+			return ogsjob;
 		default:
 			throw new IllegalArgumentException("Scheduler " + scheduler + " not supported.");
 		}

@@ -1,5 +1,7 @@
 package fastq;
 
+import general.CommandLineParser;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -7,7 +9,6 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 
-import broad.core.parser.CommandLineParser;
 
 /**
  * @author prussell

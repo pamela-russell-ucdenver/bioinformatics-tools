@@ -1,8 +1,9 @@
 package tests;
 
+import general.CommandLineParser;
+
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
 
 public class Sleep {
 	

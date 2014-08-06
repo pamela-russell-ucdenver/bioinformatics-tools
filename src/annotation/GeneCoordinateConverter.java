@@ -3,6 +3,8 @@
  */
 package annotation;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -13,7 +15,6 @@ import java.util.TreeSet;
 import nextgen.core.annotation.Gene;
 
 
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 /**

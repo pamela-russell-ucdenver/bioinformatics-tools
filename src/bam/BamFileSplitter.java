@@ -1,7 +1,7 @@
 package bam;
 
+import general.CommandLineParser;
 import pipeline.util.BamUtils;
-import broad.core.parser.CommandLineParser;
 
 public class BamFileSplitter {
 

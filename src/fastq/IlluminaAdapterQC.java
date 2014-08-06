@@ -3,6 +3,8 @@
  */
 package fastq;
 
+import general.CommandLineParser;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -12,7 +14,6 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import broad.core.parser.CommandLineParser;
 import broad.core.sequence.FastaSequenceIO;
 import broad.core.sequence.Sequence;
 

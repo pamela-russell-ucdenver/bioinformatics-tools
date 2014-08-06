@@ -3,6 +3,8 @@
  */
 package sequence;
 
+import general.CommandLineParser;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
@@ -13,7 +15,6 @@ import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
 import broad.core.sequence.Sequence;
 import broad.core.sequence.TranscribedRegions;
 import nextgen.core.annotation.Annotation;

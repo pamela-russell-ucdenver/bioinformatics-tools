@@ -3,6 +3,8 @@
  */
 package conservation;
 
+import general.StringParser;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -22,7 +24,6 @@ import org.apache.log4j.Logger;
 import broad.core.annotation.BasicLightweightAnnotation;
 import broad.core.annotation.LightweightGenomicAnnotation;
 import broad.core.math.Statistics;
-import broad.core.parser.StringParser;
 import broad.core.siphy.EvolutionaryModel.OmegaFit;
 
 /**

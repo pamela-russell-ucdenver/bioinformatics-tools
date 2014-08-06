@@ -1,5 +1,8 @@
 package file;
 
+import general.CommandLineParser;
+import general.StringParser;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -11,8 +14,6 @@ import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
-import broad.core.parser.StringParser;
 
 /**
  * Make a histogram of number of occurrences of a string in a list of strings

@@ -3,6 +3,8 @@
  */
 package bed;
 
+import general.CommandLineParser;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -18,7 +20,6 @@ import org.apache.log4j.Logger;
 import nextgen.core.annotation.Annotation;
 import nextgen.core.annotation.Gene;
 
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 /**

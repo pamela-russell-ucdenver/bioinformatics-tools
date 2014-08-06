@@ -3,14 +3,13 @@
  */
 package primer;
 
+import general.CommandLineParser;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import broad.core.parser.CommandLineParser;
-import broad.core.primer3.PrimerPair;
-import broad.core.primer3.PrimerUtils;
 
 /**
  * @author prussell

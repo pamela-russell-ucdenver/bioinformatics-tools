@@ -1,5 +1,7 @@
 package tests;
 
+import general.CommandLineParser;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -8,7 +10,6 @@ import pipeline.ConfigFile;
 import pipeline.ConfigFileOption;
 import pipeline.ConfigFileSection;
 
-import broad.core.parser.CommandLineParser;
 
 /**
  * @author prussell

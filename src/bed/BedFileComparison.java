@@ -1,5 +1,7 @@
 package bed;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Collection;
@@ -8,7 +10,6 @@ import nextgen.core.annotation.Gene;
 
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 public class BedFileComparison {

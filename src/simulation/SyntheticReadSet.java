@@ -3,6 +3,8 @@
  */
 package simulation;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -14,7 +16,6 @@ import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import broad.core.datastructures.Pair;
-import broad.core.parser.CommandLineParser;
 import broad.core.sequence.FastaSequenceIO;
 import broad.core.sequence.Sequence;
 import broad.pda.annotation.BEDFileParser;

@@ -3,17 +3,21 @@
  */
 package motif;
 
+import general.CommandLineParser;
+
 import java.io.IOException;
 
 
-import nextgen.core.job.Job;
+
+import nextgen.core.pipeline.util.OGSUtils;
 
 import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
+import org.ggf.drmaa.Session;
 
+import pipeline.Job;
 import pipeline.Scheduler;
 
-import broad.core.parser.CommandLineParser;
 
 /**
  * @author prussell
@@ -25,19 +29,21 @@ public class FimoPipeline {
 	private String outDir;
 	private String fimoTxtFile;
 	private static Logger logger = Logger.getLogger(FimoPipeline.class.getName());
+	private Session session;
 	
 	
-	private FimoPipeline(String description, String outDirectory) {
+	private FimoPipeline(String description, String outDirectory, Session drmaaSession) {
 		jobDescription = description;
 		outDir = outDirectory;
 		fimoTxtFile = outDir + "/fimo.txt";
+		session = drmaaSession;
 	}
 	
 	private void runFimo(String fimoExecutable, String sequenceFasta, String motifXml, double fimoOptionAlpha, double fimoOptionQvalueThreshold, String addlOptions, String queue, int memoryRequest, Scheduler scheduler) throws IOException, InterruptedException, DrmaaException {
 		logger.info("");
 		logger.info("Running FIMO...");
 		FimoJob fj = new FimoJob(fimoExecutable, sequenceFasta, motifXml, outDir, fimoOptionAlpha, fimoOptionQvalueThreshold, addlOptions, jobDescription);
-		Job job = fj.submitJob(queue, memoryRequest, scheduler);
+		Job job = fj.submitJob(queue, memoryRequest, scheduler, session);
 		logger.info("Waiting for FIMO job to finish...");
 		job.waitFor();
 		logger.info("Done running FIMO.");
@@ -47,7 +53,7 @@ public class FimoPipeline {
 		logger.info("");
 		logger.info("Running Fimo2Bed...");
 		Fimo2BedJob f2b = new Fimo2BedJob(fimoTxtFile, bedAnnotation, jobDescription, outDir, fimo2BedJar, scheduler);
-		Job job = f2b.submitJob();
+		Job job = f2b.submitJob(session);
 		logger.info("Waiting for Fimo2Bed job to finish...");
 		job.waitFor();
 		logger.info("Done running Fimo2Bed.");
@@ -88,7 +94,9 @@ public class FimoPipeline {
 		String outDirectory = p.getStringArg("-o");
 		Scheduler scheduler = Scheduler.fromString(p.getStringArg("-s"));
 		
-		FimoPipeline fp = new FimoPipeline(description, outDirectory);
+		Session drmaaSession = scheduler.equals(Scheduler.OGS) ? OGSUtils.getDrmaaSession() : null;
+		
+		FimoPipeline fp = new FimoPipeline(description, outDirectory, drmaaSession);
 		fp.runFimo(fimoExecutable, sequenceFasta, motifXml, fimoOptionAlpha, fimoOptionQvalueThreshold, FimoJob.ADDITIONAL_OPTIONS, queue, memoryRequest, scheduler);
 		fp.runFimo2Bed(bedAnnotation, fimo2BedJar, scheduler);
 		

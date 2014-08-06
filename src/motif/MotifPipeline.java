@@ -3,6 +3,9 @@
  */
 package motif;
 
+import general.CommandLineParser;
+import general.StringParser;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -14,21 +17,21 @@ import java.util.Map;
 
 import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
+import org.ggf.drmaa.Session;
 
+import pipeline.Job;
+import pipeline.JobUtils;
+import pipeline.LSFJob;
 import pipeline.Scheduler;
 
 import annotation.WindowWriter;
 import bed.BedFileCollapseOverlappers;
 import bed.BedFileFilter;
 import broad.core.math.EmpiricalDistribution;
-import broad.core.parser.CommandLineParser;
-import broad.core.parser.StringParser;
 import broad.pda.annotation.BEDFileParser;
 
 import nextgen.core.annotation.Gene;
-import nextgen.core.job.Job;
-import nextgen.core.job.JobUtils;
-import nextgen.core.job.LSFJob;
+import nextgen.core.pipeline.util.OGSUtils;
 import nextgen.core.programs.FastaAnnotationExtractor;
 
 /**
@@ -46,6 +49,8 @@ public class MotifPipeline {
 	private String collapsedFeatureBed;
 	private String collapsedFeatureFasta;
 	private String geneBed;
+	
+	private Session session;
 	
 	private String genesMinusCollapsedFeaturesBed;
 	private String genesMinusCollapsedFeaturesWindowBed;
@@ -69,8 +74,10 @@ public class MotifPipeline {
 	 * @param genomeFastaFile Genome fasta file
 	 * @throws IOException
 	 */
-	public MotifPipeline(String geneBedFile, String featureBedFile, String genomeFastaFile) throws IOException {
+	public MotifPipeline(String geneBedFile, String featureBedFile, String genomeFastaFile, Session drmaaSession) throws IOException {
 
+		session = drmaaSession;
+		
 		File d = new File(BSUB_DIR);
 		@SuppressWarnings("unused")
 		boolean madeDir = d.mkdir();
@@ -466,8 +473,9 @@ public class MotifPipeline {
 	 * @return List of LSF job IDs
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	private ArrayList<Job> submitFimo2BedOnEachGene(String fimo2BedJar, Scheduler scheduler) throws IOException, InterruptedException {
+	private ArrayList<Job> submitFimo2BedOnEachGene(String fimo2BedJar, Scheduler scheduler) throws IOException, InterruptedException, DrmaaException {
 		logger.info("");
 		logger.info("Creating bed files of FIMO results for each gene individually...");
 		ArrayList<Job> jobs = new ArrayList<Job>();
@@ -487,14 +495,14 @@ public class MotifPipeline {
 				String outDir = FIMO_DIR;
 				String id = "fimo_" + description;
 				Fimo2BedJob f = new Fimo2BedJob(fimoFile, bed, id, outDir, fimo2BedJar, scheduler);
-				Job job = f.submitJob();
+				Job job = f.submitJob(session);
 				jobs.add(job);
 			}
 		}
 		return jobs;
 	}
 	
-	private ArrayList<Job> submitFimo2Bed(String fimo2BedJar, Scheduler scheduler) throws IOException, InterruptedException {
+	private ArrayList<Job> submitFimo2Bed(String fimo2BedJar, Scheduler scheduler) throws IOException, InterruptedException, DrmaaException {
 		logger.info("");
 		logger.info("Creating bed files of FIMO results for all genes together...");
 		ArrayList<Job> jobs = new ArrayList<Job>();
@@ -508,7 +516,7 @@ public class MotifPipeline {
 			String outDir = FIMO_DIR;
 			String id = description;
 			Fimo2BedJob f = new Fimo2BedJob(fimoFile, geneBed, id, outDir, fimo2BedJar, scheduler);
-			Job job = f.submitJob();
+			Job job = f.submitJob(session);
 			jobs.add(job);
 		}
 		return jobs;
@@ -548,12 +556,13 @@ public class MotifPipeline {
 	 * @return LSF job ID
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	protected Job submitDreme(String dremeExecutable, String additionalDremeOptions, String jobDescription, String lsfQueue, int memoryRequest, Scheduler scheduler) throws IOException, InterruptedException {
+	protected Job submitDreme(String dremeExecutable, String additionalDremeOptions, String jobDescription, String lsfQueue, int memoryRequest, Scheduler scheduler) throws IOException, InterruptedException, DrmaaException {
 		logger.info("");
 		logger.info("Running DREME...");
 		DremeJob d = new DremeJob(dremeExecutable, collapsedFeatureFasta, genesMinusCollapsedFeaturesWindowFasta, jobDescription, getDremeDirectory(jobDescription), additionalDremeOptions, scheduler);
-		Job job = d.submitJob(lsfQueue, memoryRequest);
+		Job job = d.submitJob(lsfQueue, memoryRequest, session);
 		dremeJobDescriptions.add(jobDescription);
 		return job;
 	}
@@ -579,12 +588,13 @@ public class MotifPipeline {
 	 * @return LSF job ID
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	protected Job submitFimo(String fimoExecutable, double fimoOptionAlpha, double fimoOptionQvalThresh, String additionalFimoOptions, String jobDescription, String lsfQueue, int memoryRequest, Scheduler scheduler) throws IOException, InterruptedException {
+	protected Job submitFimo(String fimoExecutable, double fimoOptionAlpha, double fimoOptionQvalThresh, String additionalFimoOptions, String jobDescription, String lsfQueue, int memoryRequest, Scheduler scheduler) throws IOException, InterruptedException, DrmaaException {
 		logger.info("");
 		logger.info("Running FIMO...");
 		FimoJob f = new FimoJob(fimoExecutable, collapsedFeatureFasta, getMotifFile(jobDescription), getFimoDirectory(jobDescription), fimoOptionAlpha, fimoOptionQvalThresh, additionalFimoOptions, jobDescription);
-		Job job = f.submitJob(lsfQueue, memoryRequest, scheduler);
+		Job job = f.submitJob(lsfQueue, memoryRequest, scheduler, session);
 		fimoJobDescriptions.add(jobDescription);
 		return job;
 	}
@@ -598,8 +608,9 @@ public class MotifPipeline {
 	 * @return List of LSF job IDs
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	private ArrayList<Job> submitFimoOnAllGenesWithIndividualGeneMotifs(String fimoExecutable, double fimoOptionAlpha, double fimoOptionQvalThresh, String additionalFimoOptions, Scheduler scheduler) throws IOException, InterruptedException {
+	private ArrayList<Job> submitFimoOnAllGenesWithIndividualGeneMotifs(String fimoExecutable, double fimoOptionAlpha, double fimoOptionQvalThresh, String additionalFimoOptions, Scheduler scheduler) throws IOException, InterruptedException, DrmaaException {
 		logger.info("");
 		logger.info("Using FIMO to search for individual gene motifs among all genes...");
 		ArrayList<Job> jobs = new ArrayList<Job>();
@@ -612,7 +623,7 @@ public class MotifPipeline {
 				logger.info("Searching for motifs from gene " + gene.getName());
 				String jobDescription = ALL_FEATURES_JOB_DESCRIPTION + "_" + gene.getName() + "_motif";
 				FimoJob f = new FimoJob(fimoExecutable, collapsedFeatureFasta, getMotifFile(geneJobDescription), getFimoDirectory(jobDescription), fimoOptionAlpha, fimoOptionQvalThresh, additionalFimoOptions, jobDescription);
-				Job job = f.submitJob("week", 4, scheduler);
+				Job job = f.submitJob("week", 4, scheduler, session);
 				fimoJobDescriptions.add(jobDescription);
 				jobs.add(job);
 			}
@@ -647,8 +658,9 @@ public class MotifPipeline {
 		String fimoExecutable = p.getStringArg("-f");
 		String fimo2bedJar = p.getStringArg("-f2b");
 		Scheduler scheduler = Scheduler.fromString(p.getStringArg("-s"));
-
-		MotifPipeline m = new MotifPipeline(geneBed, featureBed, genomeFasta);
+		Session drmaaSession = scheduler.equals(Scheduler.OGS) ? OGSUtils.getDrmaaSession() : null;
+		
+		MotifPipeline m = new MotifPipeline(geneBed, featureBed, genomeFasta, drmaaSession);
 
 		// Run DREME on all genes together
 		ArrayList<Job> allGenesDremeJob = new ArrayList<Job>();

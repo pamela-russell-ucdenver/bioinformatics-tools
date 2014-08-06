@@ -3,6 +3,9 @@
  */
 package motif;
 
+import general.CommandLineParser;
+import general.StringParser;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -15,8 +18,6 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
-import broad.core.parser.StringParser;
 import broad.pda.annotation.BEDFileParser;
 
 import nextgen.core.annotation.Gene;

@@ -1,5 +1,7 @@
 package fastq;
 
+import general.CommandLineParser;
+
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
@@ -13,7 +15,6 @@ import nextgen.core.utils.FileUtil;
 
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
 import broad.pda.seq.fastq.FastqParser;
 import broad.pda.seq.fastq.FastqSequence;
 

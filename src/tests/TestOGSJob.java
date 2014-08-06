@@ -6,13 +6,14 @@ package tests;
 import java.io.IOException;
 import java.util.ArrayList;
 
-import nextgen.core.job.Job;
-import nextgen.core.job.JobUtils;
-import nextgen.core.job.OGSJob;
 import nextgen.core.pipeline.util.OGSUtils;
 
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.Session;
+
+import pipeline.Job;
+import pipeline.JobUtils;
+import pipeline.OGSJob;
 
 /**
  * @author prussell

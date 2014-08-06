@@ -1,11 +1,12 @@
 package tests.berkeleydb;
 
 
+import general.CommandLineParser;
+
 import org.apache.log4j.Logger;
 
 import com.sleepycat.persist.EntityCursor;
 
-import broad.core.parser.CommandLineParser;
 
 /**
  * Class to retrieve foods from the database by key values

@@ -3,18 +3,22 @@
  */
 package motif;
 
+import general.CommandLineParser;
+
 import java.io.IOException;
 import java.util.ArrayList;
 
-import org.ggf.drmaa.DrmaaException;
+import nextgen.core.pipeline.util.OGSUtils;
 
+import org.ggf.drmaa.DrmaaException;
+import org.ggf.drmaa.Session;
+
+import pipeline.Job;
+import pipeline.JobUtils;
 import pipeline.Scheduler;
 
-import nextgen.core.job.Job;
-import nextgen.core.job.JobUtils;
 
 
-import broad.core.parser.CommandLineParser;
 
 /**
  * @author prussell
@@ -30,8 +34,8 @@ public class BatchedMotifPipeline extends MotifPipeline {
 	 * @param genomeFastaFile
 	 * @throws IOException
 	 */
-	public BatchedMotifPipeline(String geneBedFile, String featureBedFile, String genomeFastaFile) throws IOException {
-		super(geneBedFile, featureBedFile, genomeFastaFile);
+	public BatchedMotifPipeline(String geneBedFile, String featureBedFile, String genomeFastaFile, Session drmaaSession) throws IOException {
+		super(geneBedFile, featureBedFile, genomeFastaFile, drmaaSession);
 	}
 
 	
@@ -65,7 +69,9 @@ public class BatchedMotifPipeline extends MotifPipeline {
 		double qvalThresh = p.getDoubleArg("-q");
 		Scheduler scheduler = Scheduler.fromString(p.getStringArg("-s"));
 
-		BatchedMotifPipeline m = new BatchedMotifPipeline(geneBed, featureBed, genomeFasta);
+		Session drmaaSession = scheduler.equals(Scheduler.OGS) ? OGSUtils.getDrmaaSession() : null;
+		
+		BatchedMotifPipeline m = new BatchedMotifPipeline(geneBed, featureBed, genomeFasta, drmaaSession);
 
 		if(dremeExecutable != null) {
 			ArrayList<Job> jobs = new ArrayList<Job>();

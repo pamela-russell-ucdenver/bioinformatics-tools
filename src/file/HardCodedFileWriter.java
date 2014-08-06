@@ -1,12 +1,13 @@
 package file;
 
+import general.CommandLineParser;
+import general.StringParser;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
-import broad.core.parser.CommandLineParser;
-import broad.core.parser.StringParser;
 
 /**
  * Write the text of a Java method to write out the contents of a provided file

@@ -3,6 +3,8 @@
  */
 package rnaseq;
 
+import general.CommandLineParser;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -15,19 +17,17 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
 
+import pipeline.Job;
+import pipeline.JobUtils;
+import pipeline.LSFJob;
 import pipeline.Scheduler;
 
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 import nextgen.core.annotation.Gene;
 import nextgen.core.coordinatesystem.TranscriptomeSpace;
-import nextgen.core.job.Job;
-import nextgen.core.job.JobUtils;
-import nextgen.core.job.LSFJob;
 import nextgen.core.model.AlignmentModel;
 import nextgen.core.normalize.CrossSampleTranscriptAverageNormalization;
-import nextgen.core.normalize.NormalizationUtils;
 import nextgen.core.normalize.TranscriptAverageNormalization;
 
 /**

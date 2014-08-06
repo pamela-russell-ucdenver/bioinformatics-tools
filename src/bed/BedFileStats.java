@@ -1,5 +1,7 @@
 package bed;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -12,7 +14,6 @@ import org.apache.log4j.Logger;
 import nextgen.core.annotation.Gene;
 
 import broad.core.math.Statistics;
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 /**

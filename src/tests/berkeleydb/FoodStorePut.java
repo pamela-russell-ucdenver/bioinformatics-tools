@@ -1,12 +1,13 @@
 package tests.berkeleydb;
 
+import general.CommandLineParser;
+
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Map;
 
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
 
 /**
  * Class to add foods to the database

@@ -5,10 +5,14 @@ package motif;
 
 import java.io.IOException;
 
+import org.ggf.drmaa.DrmaaException;
+import org.ggf.drmaa.Session;
+
+import pipeline.Job;
+import pipeline.LSFJob;
+import pipeline.OGSJob;
 import pipeline.Scheduler;
 
-import nextgen.core.job.Job;
-import nextgen.core.job.LSFJob;
 
 
 /**
@@ -42,11 +46,13 @@ public class Fimo2BedJob {
 	}
 	
 	/**
+	 * @param drmaaSession Active DRMAA session or null if not using OGS
 	 * @return Job
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	public Job submitJob() throws IOException, InterruptedException {
+	public Job submitJob(Session drmaaSession) throws IOException, InterruptedException, DrmaaException {
 		String cmmd = "java -jar -Xmx3g -Xms2g -Xmn1g " + fimo2bedJar + " ";
 		cmmd += "-b " + bedAnnotation + " ";
 		cmmd += "-f " + fimoFile + " ";
@@ -59,6 +65,10 @@ public class Fimo2BedJob {
 			LSFJob job = new LSFJob(Runtime.getRuntime(), lsfJobID, cmmd, bsubOut, "hour", 4);
 			job.submit();
 			return job;
+		case OGS:
+			OGSJob ogsjob = new OGSJob(drmaaSession, cmmd);
+			ogsjob.submit();
+			return ogsjob;
 		default:
 			throw new IllegalArgumentException("Scheduler " + scheduler.toString() + " not supported.");
 		}

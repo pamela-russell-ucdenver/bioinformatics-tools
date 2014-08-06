@@ -1,5 +1,8 @@
 package primer;
 
+import general.CommandLineParser;
+import general.StringParser;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -10,9 +13,6 @@ import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
-import broad.core.parser.StringParser;
-import broad.core.primer3.PrimerPair;
 import broad.core.sequence.FastaSequenceIO;
 import broad.core.sequence.Sequence;
 

@@ -1,5 +1,8 @@
 package motif;
 
+import general.CommandLineParser;
+import general.StringParser;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -15,8 +18,6 @@ import org.apache.log4j.Logger;
 
 import broad.core.motif.SearchException;
 import broad.core.motif.SequenceMotif;
-import broad.core.parser.CommandLineParser;
-import broad.core.parser.StringParser;
 import broad.core.sequence.FastaSequenceIO;
 import broad.core.sequence.Sequence;
 import broad.core.sequence.SequenceRegion;

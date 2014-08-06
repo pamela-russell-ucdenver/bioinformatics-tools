@@ -3,6 +3,8 @@
  */
 package conservation;
 
+import general.CommandLineParser;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
@@ -12,7 +14,6 @@ import java.util.TreeSet;
 import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
 import broad.core.siphy.EvolutionaryModel.OmegaFit;
 import broad.pda.annotation.BEDFileParser;
 

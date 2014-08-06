@@ -1,5 +1,7 @@
 package tests;
 
+import general.CommandLineParser;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
@@ -11,7 +13,6 @@ import nextgen.core.annotation.Annotation;
 import nextgen.core.annotation.Gene;
 import nextgen.core.utils.AnnotationUtils;
 
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 public class TestMergeAnnotations {

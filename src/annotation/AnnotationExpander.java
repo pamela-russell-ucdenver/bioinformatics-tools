@@ -1,5 +1,7 @@
 package annotation;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -12,7 +14,6 @@ import nextgen.core.annotation.Annotation.Strand;
 import nextgen.core.annotation.Gene;
 import nextgen.core.utils.AnnotationUtils;
 
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 public class AnnotationExpander {

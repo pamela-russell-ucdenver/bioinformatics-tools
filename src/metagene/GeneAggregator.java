@@ -1,5 +1,7 @@
 package metagene;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -12,7 +14,6 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 import nextgen.core.annotation.Gene;

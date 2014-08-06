@@ -1,5 +1,7 @@
 package bam;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -13,7 +15,6 @@ import org.apache.log4j.Logger;
 
 
 import broad.core.datastructures.Pair;
-import broad.core.parser.CommandLineParser;
 import broad.pda.annotation.BEDFileParser;
 
 import net.sf.picard.sam.BuildBamIndex;

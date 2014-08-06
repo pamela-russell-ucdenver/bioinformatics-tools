@@ -1,5 +1,7 @@
 package bam;
 
+import general.CommandLineParser;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -11,7 +13,6 @@ import net.sf.samtools.SAMFormatException;
 import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMRecordIterator;
 import broad.core.math.EmpiricalDistribution;
-import broad.core.parser.CommandLineParser;
 
 /**
  * @author prussell

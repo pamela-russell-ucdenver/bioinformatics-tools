@@ -1,12 +1,13 @@
 package sequence;
 
+import general.CommandLineParser;
+
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.List;
 
 import org.apache.log4j.Logger;
 
-import broad.core.parser.CommandLineParser;
 import broad.core.sequence.FastaSequenceIO;
 import broad.core.sequence.Sequence;
 

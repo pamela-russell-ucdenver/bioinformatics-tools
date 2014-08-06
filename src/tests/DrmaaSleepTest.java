@@ -1,5 +1,7 @@
 package tests;
 
+import general.CommandLineParser;
+
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -8,12 +10,12 @@ import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.Session;
 
-import nextgen.core.job.Job;
-import nextgen.core.job.JobUtils;
-import nextgen.core.job.OGSJob;
+import pipeline.Job;
+import pipeline.JobUtils;
+import pipeline.OGSJob;
+
 import nextgen.core.pipeline.util.OGSUtils;
 
-import broad.core.parser.CommandLineParser;
 
 public class DrmaaSleepTest {
 	
