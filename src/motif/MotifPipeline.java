@@ -22,6 +22,7 @@ import org.ggf.drmaa.Session;
 import pipeline.Job;
 import pipeline.JobUtils;
 import pipeline.LSFJob;
+import pipeline.OGSJob;
 import pipeline.Scheduler;
 
 import annotation.WindowWriter;
@@ -294,11 +295,13 @@ public class MotifPipeline {
 	 * Run DREME on features within one gene
 	 * @param gene The gene
 	 * @param dremeExecutable DREME executable
+	 * @param drmaaSession DRMAA session or null if not using OGS
 	 * @return LSF job ID
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	private Job submitDremeOnGene(Gene gene, String dremeExecutable, String batchedMotifPipelineJar, Scheduler scheduler) throws IOException, InterruptedException {
+	private Job submitDremeOnGene(Gene gene, String dremeExecutable, String batchedMotifPipelineJar, Scheduler scheduler, Session drmaaSession) throws IOException, InterruptedException, DrmaaException {
 		String cmmd = "java -jar -Xmx14g -Xms10g -Xmn8g ";
 		cmmd += batchedMotifPipelineJar + " ";
 		cmmd += "-gb " + getIndividualGeneBedFileName(gene) + " ";
@@ -317,6 +320,10 @@ public class MotifPipeline {
 			LSFJob job = new LSFJob(Runtime.getRuntime(), jobID, cmmd, bsubOut, "hour", 16);
 			job.submit();
 			return job;
+		case OGS:
+			OGSJob ogsjob = new OGSJob(drmaaSession, cmmd);
+			ogsjob.submit();
+			return ogsjob;
 		default:
 			throw new IllegalArgumentException("Scheduler " + scheduler.toString() + " not supported.");
 		}
@@ -337,11 +344,13 @@ public class MotifPipeline {
 	 * @param fimoExecutable Fimo executable
 	 * @param fimoOptionAlpha Expected proportion of sequences with the motif
 	 * @param qvalThreshold Q value threshold
+	 * @param DRMAA session or null if not using OGS
 	 * @return LSF job ID
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	private Job submitFimoOnGene(Gene gene, String fimoExecutable, double fimoOptionAlpha, double qvalThreshold, String batchedMotifPipelineJar, Scheduler scheduler) throws IOException, InterruptedException {
+	private Job submitFimoOnGene(Gene gene, String fimoExecutable, double fimoOptionAlpha, double qvalThreshold, String batchedMotifPipelineJar, Scheduler scheduler, Session drmaaSession) throws IOException, InterruptedException, DrmaaException {
 		String cmmd = "java -jar -Xmx3g -Xms2g -Xmn1g ";
 		cmmd += batchedMotifPipelineJar + " ";
 		cmmd += "-f " + fimoExecutable + " ";
@@ -360,8 +369,12 @@ public class MotifPipeline {
 			LSFJob job = new LSFJob(Runtime.getRuntime(), jobID, cmmd, bsubOut, "hour", 4);
 			job.submit();
 			return job;
+		case OGS:
+			OGSJob ogsjob = new OGSJob(drmaaSession, cmmd);
+			ogsjob.submit();
+			return ogsjob;
 		default:
-			throw new IllegalArgumentException("Scheduler " + scheduler + " not submitted.");
+			throw new IllegalArgumentException("Scheduler " + scheduler + " not supported.");
 		}
 	}
 	
@@ -419,8 +432,9 @@ public class MotifPipeline {
 	 * @return List of LSF job IDs
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	private ArrayList<Job> submitDremeOnEachGene(String dremeExecutable, String batchedMotifPipelineJar, Scheduler scheduler) throws IOException, InterruptedException {
+	private ArrayList<Job> submitDremeOnEachGene(String dremeExecutable, String batchedMotifPipelineJar, Scheduler scheduler) throws IOException, InterruptedException, DrmaaException {
 		logger.info("");
 		logger.info("Running DREME on each gene individually...");
 		ArrayList<Job> jobs = new ArrayList<Job>();
@@ -431,7 +445,7 @@ public class MotifPipeline {
 					logger.warn("Gene " + gene.getName() + " has no overlapping features. Skipping.");
 					continue;
 				}
-				Job job = submitDremeOnGene(gene, dremeExecutable, batchedMotifPipelineJar, scheduler);
+				Job job = submitDremeOnGene(gene, dremeExecutable, batchedMotifPipelineJar, scheduler, session);
 				jobs.add(job);
 			}
 		}
@@ -446,8 +460,9 @@ public class MotifPipeline {
 	 * @return List of LSF job IDs
 	 * @throws IOException
 	 * @throws InterruptedException
+	 * @throws DrmaaException 
 	 */
-	private ArrayList<Job> submitFimoOnEachGene(String fimoExecutable, String batchedMotifPipelineJar, Scheduler scheduler) throws IOException, InterruptedException {
+	private ArrayList<Job> submitFimoOnEachGene(String fimoExecutable, String batchedMotifPipelineJar, Scheduler scheduler) throws IOException, InterruptedException, DrmaaException {
 		logger.info("");
 		logger.info("Running FIMO on each gene individually...");
 		ArrayList<Job> jobs = new ArrayList<Job>();
@@ -457,7 +472,7 @@ public class MotifPipeline {
 					logger.warn("Gene " + gene.getName() + " has no motifs. Skipping.");
 					continue;
 				}
-				Job job = submitFimoOnGene(gene, fimoExecutable, ESTIMATE_FIMO_ALPHA_INDIVIDUAL_GENE, DEFAULT_FIMO_QVAL_THRESHOLD, batchedMotifPipelineJar, scheduler);
+				Job job = submitFimoOnGene(gene, fimoExecutable, ESTIMATE_FIMO_ALPHA_INDIVIDUAL_GENE, DEFAULT_FIMO_QVAL_THRESHOLD, batchedMotifPipelineJar, scheduler, session);
 				jobs.add(job);
 			}
 		}
