@@ -311,16 +311,18 @@ public class MotifPipeline {
 		cmmd += "-a " + ESTIMATE_FIMO_ALPHA_INDIVIDUAL_GENE + " ";
 		cmmd += "-q " + DEFAULT_FIMO_QVAL_THRESHOLD + " ";
 		String description = getJobDescription(gene);
-		cmmd += "-de " + description;
+		cmmd += "-de " + description + " ";
 		dremeJobDescriptions.add(description);
 		String jobID = "dreme_" + description + "_" + System.currentTimeMillis();
 		switch(scheduler) {
 		case LSF:
+			cmmd += "-s " + Scheduler.LSF.toString() + " ";
 			String bsubOut = BSUB_DIR + "/" + jobID + ".bsub";
 			LSFJob job = new LSFJob(Runtime.getRuntime(), jobID, cmmd, bsubOut, "hour", 16);
 			job.submit();
 			return job;
 		case OGS:
+			cmmd += "-s " + Scheduler.OGS.toString() + " ";
 			OGSJob ogsjob = new OGSJob(drmaaSession, cmmd);
 			ogsjob.submit();
 			return ogsjob;
@@ -360,16 +362,18 @@ public class MotifPipeline {
 		cmmd += "-a " + fimoOptionAlpha + " ";
 		cmmd += "-q " + qvalThreshold + " ";
 		String description = getJobDescription(gene);
-		cmmd += "-de " + description;
+		cmmd += "-de " + description + " ";
 		fimoJobDescriptions.add(description);
 		String jobID = "fimo_" + description + "_" + System.currentTimeMillis();
 		switch(scheduler) {
 		case LSF:
+			cmmd += "-s " + Scheduler.LSF.toString() + " ";
 			String bsubOut = BSUB_DIR + "/" + jobID + ".bsub";
 			LSFJob job = new LSFJob(Runtime.getRuntime(), jobID, cmmd, bsubOut, "hour", 4);
 			job.submit();
 			return job;
 		case OGS:
+			cmmd += "-s " + Scheduler.OGS.toString() + " ";
 			OGSJob ogsjob = new OGSJob(drmaaSession, cmmd);
 			ogsjob.submit();
 			return ogsjob;
