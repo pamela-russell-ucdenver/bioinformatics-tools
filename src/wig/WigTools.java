@@ -1,7 +1,7 @@
 /**
  * 
  */
-package sequence;
+package wig;
 
 import general.CommandLineParser;
 

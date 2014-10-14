@@ -1,7 +1,7 @@
 /**
  * 
  */
-package sequence;
+package fasta;
 
 import general.CommandLineParser;
 
