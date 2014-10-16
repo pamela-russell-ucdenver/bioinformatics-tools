@@ -140,6 +140,46 @@ public class GeneFeatureWriter {
 	}
 	
 	/**
+	 * Get the "beginning" of each gene
+	 * If window size is larger than first exon, return entire first exon only
+	 * @param windowSize Window size to get
+	 * @return Window beginning at TSS and extending into the first exon
+	 */
+	private Collection<Gene> getWindowDownstreamOfEachTSS(int windowSize) {
+		Collection<Gene> rtrn = new TreeSet<Gene>();
+		for(Gene gene : genes) {
+			Strand orientation = gene.getOrientation();
+			if(orientation.equals(Strand.UNKNOWN)) {
+				logger.warn("Skipping gene " + gene.getName() + " because orientation is unknown.");
+			}
+			Iterator<? extends Annotation> iter = null;
+			TreeSet<Annotation> exons = new TreeSet<Annotation>();
+			exons.addAll(gene.getExonSet());
+			boolean plusStrand = orientation.equals(Strand.POSITIVE);
+			if(plusStrand) {
+				iter = exons.iterator();
+			} else {
+				iter = exons.descendingIterator();
+			}
+			Annotation exon = iter.next();
+			if(exon.getSize() <= windowSize) {
+				Gene window = new Gene(exon);
+				window.setName(gene.getName() + "_first_" + windowSize + "bp_downstream_of_TSS");
+				rtrn.add(window);
+				continue;
+			}
+			int windowLastPos = plusStrand ? exon.getStart() + windowSize - 1 : exon.getEnd() - windowSize;
+			int windowFirstPos = plusStrand ? exon.getStart() : exon.getEnd() - 1;
+			int windowStart = Math.min(windowFirstPos, windowLastPos);
+			int windowEnd = Math.max(windowFirstPos, windowLastPos) + 1;
+			Gene window = new Gene(new BasicAnnotation(gene.getChr(), windowStart, windowEnd, orientation));
+			window.setName(gene.getName() + "_first_" + windowSize + "bp_downstream_of_TSS");
+			rtrn.add(window);
+		}
+		return rtrn;
+	}
+	
+	/**
 	 * Get a window upstream of each exon exon junction in all genes
 	 * @param windowSize Window size
 	 * @param distanceUpstreamOfExon3PrimeEnd Distance upstream of 3' end of exon (number of bases to leave off of 3' end)
@@ -215,6 +255,8 @@ public class GeneFeatureWriter {
 		p.addBooleanArg("--eej", "Write window upstream of each exon exon junction", false, false);
 		p.addIntArg("--eejw", "Window size for -eej", false, 14);
 		p.addIntArg("--eejd", "Distance upstream of exon exon junction for --eej", false, 17);
+		p.addBooleanArg("--dtss", "Write window downstream of each TSS", false, false);
+		p.addIntArg("--dtssw", "Window size for --dtss", false, 200);
 		p.addBooleanArg("-mo", "Merge overlappers", false, false);
 		p.addStringArg("-o", "Output bed file", true);
 		p.parse(args);
@@ -232,6 +274,8 @@ public class GeneFeatureWriter {
 		boolean eej = p.getBooleanArg("--eej");
 		int eejw = p.getIntArg("--eejw");
 		int eejd = p.getIntArg("--eejd");
+		boolean dtss = p.getBooleanArg("--dtss");
+		int dtssw = p.getIntArg("--dtssw");
 		boolean merge = p.getBooleanArg("-mo");
 		
 		Collection<Annotation> genesToWrite = new TreeSet<Annotation>();
@@ -242,6 +286,7 @@ public class GeneFeatureWriter {
 		if(utr3) genesToWrite.addAll(gfw.getAll3UTRs());
 		if(utr5) genesToWrite.addAll(gfw.getAll5UTRs());
 		if(eej) genesToWrite.addAll(gfw.getWindowUpstreamOfEachExonExonJunction(eejw, eejd));
+		if(dtss) genesToWrite.addAll(gfw.getWindowDownstreamOfEachTSS(dtssw));
 		if(cds) genesToWrite.addAll(gfw.getAllCDSs());
 		if(merge) {
 			TreeSet<Annotation> t = new TreeSet<Annotation>();
