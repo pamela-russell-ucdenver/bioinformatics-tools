@@ -4,6 +4,7 @@
 package conservation;
 
 import general.CommandLineParser;
+import general.CountLogger;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -20,7 +21,6 @@ import broad.core.siphy.tools.conservation.EstimateOmegaPerExon;
 import broad.pda.annotation.BEDFileParser;
 import nextgen.core.annotation.Annotation;
 import nextgen.core.annotation.Gene;
-import nextgen.core.utils.CountLogger;
 
 /**
  * @author prussell
