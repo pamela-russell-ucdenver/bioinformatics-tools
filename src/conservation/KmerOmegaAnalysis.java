@@ -4,6 +4,7 @@
 package conservation;
 
 import general.CommandLineParser;
+import general.CountLogger;
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -21,7 +22,6 @@ import nextgen.core.annotation.Annotation;
 import nextgen.core.annotation.Annotation.Strand;
 import nextgen.core.annotation.Gene;
 import nextgen.core.utils.AnnotationUtils;
-import nextgen.core.utils.CountLogger;
 
 /**
  * @author prussell
