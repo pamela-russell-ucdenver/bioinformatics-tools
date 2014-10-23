@@ -11,9 +11,9 @@ import nextgen.core.pipeline.util.OGSUtils;
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.Session;
 
-import pipeline.Job;
-import pipeline.JobUtils;
-import pipeline.OGSJob;
+import guttmanlab.core.pipeline.Job;
+import guttmanlab.core.pipeline.JobUtils;
+import guttmanlab.core.pipeline.OGSJob;
 
 /**
  * @author prussell

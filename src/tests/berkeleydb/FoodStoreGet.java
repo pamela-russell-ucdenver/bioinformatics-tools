@@ -1,7 +1,7 @@
 package tests.berkeleydb;
 
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import org.apache.log4j.Logger;
 

@@ -3,7 +3,7 @@
  */
 package primer;
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import java.io.BufferedReader;
 import java.io.FileReader;

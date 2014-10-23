@@ -1,6 +1,6 @@
 package annotation;
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import java.io.FileWriter;
 import java.io.IOException;

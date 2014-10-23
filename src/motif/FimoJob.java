@@ -8,10 +8,10 @@ import java.io.IOException;
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.Session;
 
-import pipeline.Job;
-import pipeline.LSFJob;
-import pipeline.OGSJob;
-import pipeline.Scheduler;
+import guttmanlab.core.pipeline.Job;
+import guttmanlab.core.pipeline.LSFJob;
+import guttmanlab.core.pipeline.OGSJob;
+import guttmanlab.core.pipeline.Scheduler;
 
 
 

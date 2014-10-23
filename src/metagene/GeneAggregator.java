@@ -1,6 +1,6 @@
 package metagene;
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import java.io.File;
 import java.io.FileWriter;

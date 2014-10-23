@@ -3,7 +3,7 @@
  */
 package rnaseq;
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import java.io.BufferedWriter;
 import java.io.File;

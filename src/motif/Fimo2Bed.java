@@ -3,8 +3,8 @@
  */
 package motif;
 
-import general.CommandLineParser;
-import general.StringParser;
+import guttmanlab.core.util.CommandLineParser;
+import guttmanlab.core.util.StringParser;
 
 import java.io.BufferedReader;
 import java.io.File;

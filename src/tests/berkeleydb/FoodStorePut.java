@@ -1,6 +1,6 @@
 package tests.berkeleydb;
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import java.io.IOException;
 import java.util.Collection;

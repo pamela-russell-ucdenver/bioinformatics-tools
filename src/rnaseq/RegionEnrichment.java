@@ -3,7 +3,7 @@
  */
 package rnaseq;
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -17,10 +17,10 @@ import java.util.Map;
 import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
 
-import pipeline.Job;
-import pipeline.JobUtils;
-import pipeline.LSFJob;
-import pipeline.Scheduler;
+import guttmanlab.core.pipeline.Job;
+import guttmanlab.core.pipeline.JobUtils;
+import guttmanlab.core.pipeline.LSFJob;
+import guttmanlab.core.pipeline.Scheduler;
 
 import broad.pda.annotation.BEDFileParser;
 

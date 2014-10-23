@@ -6,9 +6,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 
-import pipeline.ConfigFile;
-import pipeline.ConfigFileOption;
-import pipeline.ConfigFileSection;
+import guttmanlab.core.pipeline.ConfigFile;
+import guttmanlab.core.pipeline.ConfigFileOption;
+import guttmanlab.core.pipeline.ConfigFileSection;
 
 
 /**

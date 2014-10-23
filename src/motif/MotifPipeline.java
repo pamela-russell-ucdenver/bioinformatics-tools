@@ -3,8 +3,8 @@
  */
 package motif;
 
-import general.CommandLineParser;
-import general.StringParser;
+import guttmanlab.core.util.CommandLineParser;
+import guttmanlab.core.util.StringParser;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -19,11 +19,11 @@ import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.Session;
 
-import pipeline.Job;
-import pipeline.JobUtils;
-import pipeline.LSFJob;
-import pipeline.OGSJob;
-import pipeline.Scheduler;
+import guttmanlab.core.pipeline.Job;
+import guttmanlab.core.pipeline.JobUtils;
+import guttmanlab.core.pipeline.LSFJob;
+import guttmanlab.core.pipeline.OGSJob;
+import guttmanlab.core.pipeline.Scheduler;
 
 import annotation.WindowWriter;
 import bed.BedFileCollapseOverlappers;

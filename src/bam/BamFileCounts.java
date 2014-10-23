@@ -3,7 +3,7 @@
  */
 package bam;
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import java.io.File;
 

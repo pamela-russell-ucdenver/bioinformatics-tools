@@ -1,6 +1,6 @@
 package tests;
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -10,9 +10,9 @@ import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.Session;
 
-import pipeline.Job;
-import pipeline.JobUtils;
-import pipeline.OGSJob;
+import guttmanlab.core.pipeline.Job;
+import guttmanlab.core.pipeline.JobUtils;
+import guttmanlab.core.pipeline.OGSJob;
 
 import nextgen.core.pipeline.util.OGSUtils;
 

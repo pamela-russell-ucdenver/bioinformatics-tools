@@ -3,8 +3,8 @@
  */
 package conservation;
 
-import general.CommandLineParser;
-import general.CountLogger;
+import guttmanlab.core.util.CommandLineParser;
+import guttmanlab.core.util.CountLogger;
 
 import java.io.File;
 import java.io.FileWriter;

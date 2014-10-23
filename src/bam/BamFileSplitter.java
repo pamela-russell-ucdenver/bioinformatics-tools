@@ -1,7 +1,7 @@
 package bam;
 
-import general.CommandLineParser;
-import pipeline.util.BamUtils;
+import guttmanlab.core.util.CommandLineParser;
+import guttmanlab.core.pipeline.util.BamUtils;
 
 public class BamFileSplitter {
 

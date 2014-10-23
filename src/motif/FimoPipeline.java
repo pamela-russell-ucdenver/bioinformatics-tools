@@ -3,7 +3,7 @@
  */
 package motif;
 
-import general.CommandLineParser;
+import guttmanlab.core.util.CommandLineParser;
 
 import java.io.IOException;
 
@@ -15,8 +15,8 @@ import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.Session;
 
-import pipeline.Job;
-import pipeline.Scheduler;
+import guttmanlab.core.pipeline.Job;
+import guttmanlab.core.pipeline.Scheduler;
 
 
 /**
