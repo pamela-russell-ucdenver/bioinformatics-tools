@@ -9,8 +9,11 @@ import guttmanlab.core.util.StringParser;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Map;
+
+import net.sf.samtools.util.CloseableIterator;
 
 import org.apache.log4j.Logger;
 
@@ -27,26 +30,42 @@ public class CountPositionsThatOverlapBedAnnotation {
 	 * @param positionList File of positions to check for gene overlap. Line format: chr   pos
 	 * @throws IOException
 	 */
-	private CountPositionsThatOverlapBedAnnotation(String bedFile, String referenceSizes, String positionList) throws IOException {
+	private CountPositionsThatOverlapBedAnnotation(String bedFile, String referenceSizes, String positionList, String outputFile) throws IOException {
 		loadGenes(bedFile, referenceSizes);
-		countOverlappers(positionList);
+		countOverlappers(positionList, outputFile);
 	}
 	
 	private void loadGenes(String bedFile, String referenceSizes) throws IOException {
 		genesByChr = BEDFileIO.loadFromFileByReferenceName(bedFile, referenceSizes);
 	}
-	
+
 	/**
 	 * Count number of positions in list that overlap some exon from annotation
 	 * @param positionList List file. Line format: chr   pos
 	 * @throws IOException 
 	 */
+	@SuppressWarnings("unused")
 	private void countOverlappers(String positionList) throws IOException {
+		countOverlappers(positionList, null);
+	}
+	
+	/**
+	 * Count number of positions in list that overlap some exon from annotation
+	 * Write list of overlaps to a file
+	 * @param positionList List file. Line format: chr   pos
+	 * @param outFile Output file
+	 * @throws IOException 
+	 */
+	private void countOverlappers(String positionList, String outFile) throws IOException {
 		logger.info("Counting overlappers...");
 		overlappers = 0;
 		nonoverlappers = 0;
 		BufferedReader reader = new BufferedReader(new FileReader(positionList));
 		StringParser p = new StringParser();
+		FileWriter writer = null;
+		if(outFile != null) {
+			writer = new FileWriter(outFile);
+		}
 		while(reader.ready()) {
 			p.parse(reader.readLine());
 			int numFields = p.getFieldCount();
@@ -64,12 +83,22 @@ public class CountPositionsThatOverlapBedAnnotation {
 			}
 			if(genesByChr.get(chr).overlaps(interval)) {
 				overlappers++;
-				logger.info(chr + "\t" + pos);
+				if(writer != null) {
+					CloseableIterator<Gene> overlappers = genesByChr.get(chr).sortedIterator(interval, false);
+					while(overlappers.hasNext()) {
+						Gene gene = overlappers.next();
+						writer.write(chr + "\t" + pos + "\t" + gene.getName() + "\n");
+					}
+					overlappers.close();
+				}
 			} else {
 				nonoverlappers++;
 			}
 		}
 		reader.close();
+		if(writer != null) {
+			writer.close();
+		}
 		logger.info("Done counting overlappers.");
 	}
 	
@@ -87,12 +116,14 @@ public class CountPositionsThatOverlapBedAnnotation {
 		p.addStringArg("-b", "Bed gene annotation", true);
 		p.addStringArg("-c", "Chromosome size file", true);
 		p.addStringArg("-p", "Position list file", true);
+		p.addStringArg("-o", "Output list of overlappers", false);
 		p.parse(args);
 		String bedFile = p.getStringArg("-b");
 		String referenceSizes = p.getStringArg("-c");
 		String positionList = p.getStringArg("-p");
+		String output = p.getStringArg("-o");
 		
-		CountPositionsThatOverlapBedAnnotation c = new CountPositionsThatOverlapBedAnnotation(bedFile, referenceSizes, positionList);
+		CountPositionsThatOverlapBedAnnotation c = new CountPositionsThatOverlapBedAnnotation(bedFile, referenceSizes, positionList, output);
 		
 		int overlappers = c.getNumOverlappers();
 		int nonoverlappers = c.getNumNonOverlappers();
