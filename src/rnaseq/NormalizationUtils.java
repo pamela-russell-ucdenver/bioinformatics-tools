@@ -8,7 +8,7 @@ import java.util.TreeMap;
 
 import org.apache.log4j.Logger;
 
-import pipeline.LSFJob;
+import guttmanlab.core.pipeline.LSFJob;
 
 import broad.pda.annotation.BEDFileParser;
 

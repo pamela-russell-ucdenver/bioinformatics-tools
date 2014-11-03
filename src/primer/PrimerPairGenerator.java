@@ -10,6 +10,9 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
+import broad.core.primer3.PrimerPair;
+import broad.core.primer3.PrimerUtils;
+
 
 /**
  * @author prussell
