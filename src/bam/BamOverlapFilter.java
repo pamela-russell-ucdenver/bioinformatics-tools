@@ -54,24 +54,24 @@ public class BamOverlapFilter {
 		return rtrn;
 	}
 	
-	private void writeReadsThatOverlapExons(FeatureCollection<Gene> genes, String outputBam) {
-		writeFilteredFile(getExons(genes), true, outputBam);
+	private void writeReadsThatOverlapExons(FeatureCollection<Gene> genes, boolean primaryAlignmentsOnly, String outputBam) {
+		writeFilteredFile(getExons(genes), true, primaryAlignmentsOnly, outputBam);
 	}
 	
-	private void writeReadsThatOverlapGeneSpans(FeatureCollection<Gene> genes, String outputBam) {
-		writeFilteredFile(getSpans(genes), true, outputBam);
+	private void writeReadsThatOverlapGeneSpans(FeatureCollection<Gene> genes, boolean primaryAlignmentsOnly, String outputBam) {
+		writeFilteredFile(getSpans(genes), true, primaryAlignmentsOnly, outputBam);
 	}
 	
-	private void writeReadsThatDoNotOverlapExons(FeatureCollection<Gene> genes, String outputBam) {
-		writeFilteredFile(getExons(genes), false, outputBam);
+	private void writeReadsThatDoNotOverlapExons(FeatureCollection<Gene> genes, boolean primaryAlignmentsOnly, String outputBam) {
+		writeFilteredFile(getExons(genes), false, primaryAlignmentsOnly, outputBam);
 	}
 	
-	private void writeReadsThatDoNotOverlapGeneSpans(FeatureCollection<Gene> genes, String outputBam) {
-		writeFilteredFile(getSpans(genes), false, outputBam);
+	private void writeReadsThatDoNotOverlapGeneSpans(FeatureCollection<Gene> genes, boolean primaryAlignmentsOnly, String outputBam) {
+		writeFilteredFile(getSpans(genes), false, primaryAlignmentsOnly, outputBam);
 	}
 	
 	
-	private void writeFilteredFile(FeatureCollection<Gene> regions, boolean keepOverlappers, String outputBam) {
+	private void writeFilteredFile(FeatureCollection<Gene> regions, boolean keepOverlappers, boolean primaryAlignmentsOnly, String outputBam) {
 		logger.info("");
 		logger.info("Writing to file " + outputBam + "...");
 		SAMFileReader reader = new SAMFileReader(new File(bamFile));
@@ -92,6 +92,9 @@ public class BamOverlapFilter {
 			}
 			Annotation mappedRegion = new SingleInterval(record.getReferenceName(), record.getAlignmentStart(), record.getAlignmentEnd(), Strand.BOTH);
 			Boolean overlaps = regions.overlaps(mappedRegion);
+			if(primaryAlignmentsOnly && record.getNotPrimaryAlignmentFlag()) {
+				continue;
+			}
 			if((overlaps && keepOverlappers) || (!overlaps && !keepOverlappers)) {
 				writer.addAlignment(record);
 				numWritten++;
@@ -110,6 +113,7 @@ public class BamOverlapFilter {
 		p.addStringArg("-o", "Output filtered bam", true);
 		p.addBooleanArg("-ko", "Keep overlappers. If false, remove overlappers.", true);
 		p.addBooleanArg("-ex", "Only use exons. If false, use entire gene spans.", true);
+		p.addBooleanArg("-pr", "Keep primary alignments only", false, true);
 		p.addStringArg("-r", "Reference sequence length file", true);
 		p.parse(args);
 		String inputBam = p.getStringArg("-i");
@@ -118,24 +122,25 @@ public class BamOverlapFilter {
 		boolean keepOverlappers = p.getBooleanArg("-ko");
 		boolean exonsOnly = p.getBooleanArg("-ex");
 		String refLengths = p.getStringArg("-r");
+		boolean primaryAlignmentsOnly = p.getBooleanArg("-pr");
 		
 		FeatureCollection<Gene> genes = (FeatureCollection<Gene>) BEDFileIO.loadFromFile(bed, refLengths);
 		BamOverlapFilter b = new BamOverlapFilter(inputBam);
 		
 		if(exonsOnly && keepOverlappers) {
-			b.writeReadsThatOverlapExons(genes, outputBam);
+			b.writeReadsThatOverlapExons(genes, primaryAlignmentsOnly, outputBam);
 		}
 		
 		if(exonsOnly && !keepOverlappers) {
-			b.writeReadsThatDoNotOverlapExons(genes, outputBam);
+			b.writeReadsThatDoNotOverlapExons(genes, primaryAlignmentsOnly, outputBam);
 		}
 		
 		if(!exonsOnly && keepOverlappers) {
-			b.writeReadsThatOverlapGeneSpans(genes, outputBam);
+			b.writeReadsThatOverlapGeneSpans(genes, primaryAlignmentsOnly, outputBam);
 		}
 		
 		if(!exonsOnly && !keepOverlappers) {
-			b.writeReadsThatDoNotOverlapGeneSpans(genes, outputBam);
+			b.writeReadsThatDoNotOverlapGeneSpans(genes, primaryAlignmentsOnly, outputBam);
 		}
 		
 		logger.info("");
