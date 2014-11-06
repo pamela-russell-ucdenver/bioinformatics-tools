@@ -1,8 +1,11 @@
 package bam;
 
 import guttmanlab.core.util.CommandLineParser;
+import guttmanlab.core.util.StringParser;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
@@ -16,14 +19,14 @@ import net.sf.samtools.SAMFormatException;
 import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMRecordIterator;
 
-public class BamCountsByReference {
+public class AlignmentCountsByReference {
 	
-	private static Logger logger = Logger.getLogger(BamCountsByReference.class.getName());
-	private String bam;
+	private static Logger logger = Logger.getLogger(AlignmentCountsByReference.class.getName());
+	private String alignmentFile;
 	private Map<String, Integer> countsByReference;
 
-	private BamCountsByReference(String bamFile) {
-		bam = bamFile;
+	private AlignmentCountsByReference(String input) {
+		alignmentFile = input;
 		countsByReference = new HashMap<String, Integer>();
 	}
 	
@@ -46,9 +49,30 @@ public class BamCountsByReference {
 		w.close();
 	}
 	
-	private void makeCounts() {
+	private void makeCountsMap() throws IOException {
 		logger.info("Making counts...");
-		SAMFileReader reader = new SAMFileReader(new File(bam));
+		BufferedReader r = new BufferedReader(new FileReader(alignmentFile));
+		int numDone = 0;
+		
+		StringParser s = new StringParser();
+		
+		while(r.ready()) {
+			String line = r.readLine();
+			numDone++;
+			if(numDone % 1000000 == 0) {
+				logger.info("Finished " + numDone + " records.");
+			}
+			s.parse(line);
+			incrementCount(s.asString(2));
+		}
+		
+		r.close();
+		logger.info("Done making counts.");
+	}
+	
+	private void makeCountsBam() {
+		logger.info("Making counts...");
+		SAMFileReader reader = new SAMFileReader(new File(alignmentFile));
 		SAMRecordIterator iter = reader.iterator();
 		int numDone = 0;
 		
@@ -74,14 +98,28 @@ public class BamCountsByReference {
 	public static void main(String[] args) throws IOException {
 		
 		CommandLineParser p = new CommandLineParser();
-		p.addStringArg("-b", "Bam file", true);
+		p.addStringArg("-b", "Bam file", false, null);
+		p.addStringArg("-m", "Map alignment file", false, null);
 		p.addStringArg("-o", "Output table", true);
 		p.parse(args);
 		String bam = p.getStringArg("-b");
 		String out = p.getStringArg("-o");
+		String map = p.getStringArg("-m");
 		
-		BamCountsByReference b = new BamCountsByReference(bam);
-		b.makeCounts();
+		if((bam == null && map == null) || (bam != null && map != null)) {
+			throw new IllegalArgumentException("Provide one: -b or -m");
+		}
+		
+		String alignmentFile = bam != null ? bam : map;
+		
+		AlignmentCountsByReference b = new AlignmentCountsByReference(alignmentFile);
+		
+		if(bam != null) {
+			b.makeCountsBam();
+		} else {
+			b.makeCountsMap();
+		}
+		
 		b.writeToFile(out);
 		
 	}
