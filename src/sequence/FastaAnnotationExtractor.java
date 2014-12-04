@@ -96,6 +96,7 @@ public class FastaAnnotationExtractor {
 				try {
 					Sequence seq = getGeneSequence(gene);
 					fsio.write(seq, b);
+					logger.info(gene.toUCSC() + ":" + gene.getOrientation().toString());
 				} catch(NullPointerException e) {
 					logger.warn("CANNOT WRITE SEQUENCE FOR " + gene.getName() + ": EMPTY");
 				}

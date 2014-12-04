@@ -2,11 +2,15 @@ package vcf;
 
 import guttmanlab.core.annotation.Annotation;
 import guttmanlab.core.annotation.Annotation.Strand;
+import guttmanlab.core.annotation.SingleInterval;
 import guttmanlab.core.sequence.Sequence;
 import guttmanlab.core.util.StringParser;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+
+import org.apache.log4j.Logger;
 
 /**
  * A VCF record
@@ -15,12 +19,14 @@ import java.util.List;
  */
 public class VCFRecord {
 	
+	public static Logger logger = Logger.getLogger(VCFRecord.class.getName());
+	
 	/**
 	 * The alternate allele field
 	 * @author prussell
 	 *
 	 */
-	private class AlternateAllele {
+	public class AlternateAllele {
 		
 		private List<Sequence> alternateSeqs;
 		
@@ -46,6 +52,38 @@ public class VCFRecord {
 			
 		}
 		
+		/**
+		 * @param singleAltSequence A single alternate sequence
+		 */
+		public AlternateAllele(Sequence singleAltSequence) {
+			alternateSeqs = new ArrayList<Sequence>();
+			alternateSeqs.add(singleAltSequence);
+		}
+		
+		/**
+		 * If there is one alternate sequence, get it
+		 * Otherwise throw an exception
+		 * @return The only alternate sequence
+		 */
+		public Sequence getSingleSeq() {
+			if(alternateSeqs.size() != 1) {
+				throw new IllegalStateException("There is not exactly one alternate sequence");
+			}
+			return alternateSeqs.iterator().next();
+		}
+		
+		/**
+		 * If there is one alternate sequence, get its size
+		 * Otherwise throw an exception
+		 * @return The size of the only alternate sequence
+		 */
+		public int getSizeOfSingleSeq() {
+			if(alternateSeqs.size() != 1) {
+				throw new IllegalStateException("There is not exactly one alternate sequence");
+			}
+			return alternateSeqs.iterator().next().getSequenceBases().length();
+		}
+		
 		public String toString() {
 			String rtrn = alternateSeqs.get(0).getSequenceBases();
 			for(int i = 1; i < alternateSeqs.size(); i++) {
@@ -57,12 +95,15 @@ public class VCFRecord {
 		/**
 		 * Reverse complement the alleles
 		 */
-		public void reverseComplement() {
-			List<Sequence> rc = new ArrayList<Sequence>();
+		public AlternateAllele reverseComplement() {
+			String list = "";
 			for(int i = 0; i < alternateSeqs.size(); i++) {
-				rc.add(alternateSeqs.get(i).reverseComplement());
+				if(i > 0) {
+					list += ",";
+				}
+				list += alternateSeqs.get(i).reverseComplement().getSequenceBases();
 			}
-			alternateSeqs = rc;
+			return new AlternateAllele(list);
 		}
 		
 	}
@@ -135,6 +176,22 @@ public class VCFRecord {
 	}
 	
 	/**
+	 * Get the reference allele as a sequence object
+	 * @return
+	 */
+	public Sequence getRefAllele() {
+		return ref;
+	}
+	
+	/**
+	 * Get the alternate allele
+	 * @return The alternate allele
+	 */
+	public AlternateAllele getAlternateAllele() {
+		return alt;
+	}
+	
+	/**
 	 * Set position
 	 * @param zeroBasedPos Zero based position to set
 	 */
@@ -156,7 +213,7 @@ public class VCFRecord {
 	 */
 	private void reverseComplementAlleles() {
 		ref = ref.reverseComplement();
-		alt.reverseComplement();
+		alt = alt.reverseComplement();
 	}
 	
 	/**
@@ -175,8 +232,21 @@ public class VCFRecord {
 		return rtrn;
 	}
 	
+	/**
+	 * @return Chromosome name
+	 */
 	public String getChrom() {
 		return chrom;
+	}
+	
+	/**
+	 * Get a single interval representing the reference allele region
+	 * Orientation is set to BOTH
+	 * @return Annotation representing the reference allele
+	 */
+	public Annotation getRefAlleleAsAnnotation() {
+		int end = pos + ref.getSequenceBases().length();
+		return new SingleInterval(chrom, pos, end, Strand.BOTH);
 	}
 	
 	/**
@@ -185,23 +255,86 @@ public class VCFRecord {
 	 * @param transcript The transcript
 	 * @return The converted record or null if position doesn't overlap transcript
 	 */
-	public static VCFRecord convertToTranscriptCoords(VCFRecord record, Annotation transcript) {
+	public static VCFRecord convertToTranscriptCoords(VCFRecord record, Annotation transcript, Sequence transcriptSequence) {
+		// Make sure ref allele is fully contained within a single block of the transcript
+		Annotation refAllele = record.getRefAlleleAsAnnotation();
+		int refStart = refAllele.getReferenceStartPosition();
+		int refEnd = refAllele.getReferenceEndPosition();
+		boolean contains = false;
+		Iterator<SingleInterval> blockIter = transcript.getBlocks();
+		while(blockIter.hasNext()) {
+			SingleInterval block = blockIter.next();
+			if(refStart >= block.getReferenceStartPosition() && refEnd <= block.getReferenceEndPosition()) {
+				contains = true;
+				break;
+			}
+		}
+		if(!contains) {
+			//logger.info(transcript.getName() + " does not contain ref allele " + record.getRefAlleleAsAnnotation().toUCSC());
+			return null;
+		}
 		VCFRecord rtrn = copy(record);
 		Strand strand = transcript.getOrientation();
 		if(strand.equals(Strand.BOTH) || strand.equals(Strand.INVALID) || strand.equals(Strand.UNKNOWN)) {
 			throw new IllegalArgumentException("Annotation strand must be known.");
-		}
-		// Reverse complement alleles if necessary
-		if(strand.equals(Strand.NEGATIVE)) {
-			rtrn.reverseComplementAlleles();
 		}
 		// Set "chromosome" to transcript name
 		rtrn.setChrom(transcript.getName());
 		// Set pos to transcript coordinate
 		int zeroBasedGenomeCoord = rtrn.getZeroBasedPos();
 		int zeroBasedTranscriptCoord = transcript.getRelativePositionFrom5PrimeOfFeature(zeroBasedGenomeCoord);
+		
+		/*
+		 *  Special procedure for deletion on negative strand gene
+		 *  Identify region to be deleted
+		 *  "Ref" allele is one upstream base plus deletion region
+		 *  "Alt" allele is just the one upstream base
+		 *  Get upstream base from transcript sequence
+		 */
+		int refSize = refAllele.size();
+		int altSize =  record.getAlternateAllele().getSizeOfSingleSeq();
+		if(refSize > 1 && altSize == 1 && strand.equals(Strand.NEGATIVE)) {
+			// Start of actual deleted region on genome is zeroBasedGenomeCoord + 1
+			// Deletion size is refSize - 1
+			zeroBasedTranscriptCoord = transcript.getRelativePositionFrom5PrimeOfFeature(zeroBasedGenomeCoord + 1) - refSize + 1;
+			String upstreamBaseToKeep = transcriptSequence.getSequenceBases().substring(zeroBasedTranscriptCoord, zeroBasedTranscriptCoord + 1).toUpperCase();
+			Sequence deletedRegionGenomic = new Sequence(record.getRefAllele().getSequenceBases().substring(1));
+			String deletedRegionTranscript = deletedRegionGenomic.reverseComplement().getSequenceBases().toUpperCase();
+			String transcriptRef = upstreamBaseToKeep + deletedRegionTranscript;
+			// Set fields in return record
+			rtrn.setZeroBasedPos(zeroBasedTranscriptCoord);
+			rtrn.ref = new Sequence(transcriptRef);
+			rtrn.alt = new VCFRecord().new AlternateAllele(new Sequence(upstreamBaseToKeep));			
+			return rtrn;
+		}
+		
+		/*
+		 *  Special procedure for insertion on negative strand gene
+		 *  Identify region to be inserted
+		 *  "Alt" allele is one upstream base plus insertion region
+		 *  "Ref" allele is just the one upstream base
+		 *  Get upstream base from transcript sequence
+		 */
+		if(refSize == 1 && altSize > 1 && strand.equals(Strand.NEGATIVE)) {
+			zeroBasedTranscriptCoord = transcript.getRelativePositionFrom5PrimeOfFeature(zeroBasedGenomeCoord + 1);
+			String upstreamBaseToKeep = transcriptSequence.getSequenceBases().substring(zeroBasedTranscriptCoord, zeroBasedTranscriptCoord + 1).toUpperCase();
+			Sequence insertedSequenceGenomic = new Sequence(record.getAlternateAllele().getSingleSeq().getSequenceBases().substring(1));
+			String insertedSequenceTranscript = insertedSequenceGenomic.reverseComplement().getSequenceBases().toUpperCase();
+			String transcriptAlt = upstreamBaseToKeep + insertedSequenceTranscript;
+			rtrn.setZeroBasedPos(zeroBasedTranscriptCoord);
+			rtrn.alt = new VCFRecord().new AlternateAllele(new Sequence(transcriptAlt));
+			rtrn.ref = new Sequence(upstreamBaseToKeep);
+			return rtrn;
+		}
+		
+		
+		
 		if(zeroBasedTranscriptCoord < 0) { // Coordinate doesn't overlap transcript
 			return null;
+		}
+		// Reverse complement alleles if necessary
+		if(strand.equals(Strand.NEGATIVE)) {
+			rtrn.reverseComplementAlleles();
 		}
 		rtrn.setZeroBasedPos(zeroBasedTranscriptCoord);
 		return rtrn;
