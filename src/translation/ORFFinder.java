@@ -39,35 +39,52 @@ public class ORFFinder {
 	}
 	
 	/**
-	 * Get all possible open reading frames of a gene
-	 * @param gene The gene
+	 * Get all possible open reading frames of an annotation
+	 * @param annotation The annotation
 	 * @return Collection of open reading frames
 	 */
-	public AnnotationCollection<Gene> getAllORFs(Gene gene) {
-		if(!gene.getOrientation().equals(Strand.POSITIVE) && !gene.getOrientation().equals(Strand.NEGATIVE)) {
+	public AnnotationCollection<Gene> getAllORFs(Annotation annotation) {
+		if(!annotation.getOrientation().equals(Strand.POSITIVE) && !annotation.getOrientation().equals(Strand.NEGATIVE)) {
 			throw new IllegalArgumentException("Gene strand must be known.");
 		}
-		Sequence chr = chrsByName.get(gene.getReferenceName());
+		Sequence chr = chrsByName.get(annotation.getReferenceName());
 		if(chr == null) {
 			String chrNames = "";
-			for(String c : chrsByName.keySet()) {
+			for(@SuppressWarnings("unused") String c : chrsByName.keySet()) {
 				chrNames += c = " ";
 			}
-			throw new IllegalArgumentException("Can't get ORFs for gene " + gene.getName() + " because reference " + gene.getReferenceName() + " is missing. Sequence names: " + chrNames);
+			throw new IllegalArgumentException("Can't get ORFs for gene " + annotation.getName() + " because reference " + annotation.getReferenceName() + " is missing. Sequence names: " + chrNames);
 		}
-		Sequence geneSeq = chr.getSubsequence(gene);
+		Sequence geneSeq = chr.getSubsequence(annotation);
 		Collection<int[]> orfCoords = findAllORFs(geneSeq);
 		FeatureCollection<Gene> rtrn = new FeatureCollection<Gene>(coordSpace);
+		Iterator<SingleInterval> blockIter = annotation.getBlocks();
+		Collection<Annotation> blocks = new ArrayList<Annotation>();
+		while(blockIter.hasNext()) {
+			blocks.add(blockIter.next());
+		}
 		for(int[] coord : orfCoords) {
-			Gene featureSpaceInterval = new Gene(new SingleInterval(gene.getName(), coord[0], coord[1], Strand.POSITIVE));
-			Annotation referenceSpaceCDS = gene.convertToReferenceSpace(featureSpaceInterval);
-			int cdsStart = referenceSpaceCDS.getReferenceStartPosition();
-			int cdsEnd = referenceSpaceCDS.getReferenceEndPosition();
-			String orfName = gene.getName() + ":ORF:" + gene.getReferenceName() + ":" + cdsStart + "-" + cdsEnd + ":" + gene.getOrientation().toString();
-			Gene orf = new Gene(gene.getBlockSet(), cdsStart, cdsEnd, orfName);
-			rtrn.addAnnotation(orf);
+			Gene featureSpaceInterval = new Gene(new SingleInterval(annotation.getName(), coord[0], coord[1], Strand.POSITIVE));
+			try {
+				Annotation referenceSpaceCDS = annotation.convertToReferenceSpace(featureSpaceInterval);
+				int cdsStart = referenceSpaceCDS.getReferenceStartPosition();
+				int cdsEnd = referenceSpaceCDS.getReferenceEndPosition();
+				String orfName = annotation.getName() + ":ORF:" + annotation.getReferenceName() + ":" + cdsStart + "-" + cdsEnd + ":" + annotation.getOrientation().toString();
+				Gene orf = new Gene(blocks, cdsStart, cdsEnd, orfName);
+				rtrn.addAnnotation(orf);
+				logger.debug("Added ORF " + orf.getName() + " " + orf.toUCSC());
+			} catch(NullPointerException e) {
+				logger.warn("Caught null pointer exception on ORF " + featureSpaceInterval.toUCSC() + ". Skipping.");
+			}
 		}
 		return rtrn;
+	}
+	
+	/**
+	 * @return Coordinate space
+	 */
+	public CoordinateSpace getCoordSpace() {
+		return coordSpace;
 	}
 	
 	/**
@@ -108,17 +125,53 @@ public class ORFFinder {
 	}
 	
 	/**
+	 * Get all upstream ORFs for genes in the bed file
+	 * @param bedFile Bed file
+	 * @return Collection of uORFs for all genes
+	 * @throws IOException
+	 */
+	private AnnotationCollection<Gene> getAllUpstreamORFsForGenes(String bedFile) throws IOException {
+		AnnotationCollection<Gene> genes = BEDFileIO.loadFromFile(bedFile, referenceSizeFile);
+		FeatureCollection<Gene> rtrn = new FeatureCollection<Gene>(coordSpace);
+		Iterator<Gene> iter = genes.sortedIterator();
+		while(iter.hasNext()) {
+			Gene gene = iter.next();
+			AnnotationCollection<UpstreamORF> uorfs = UpstreamORF.findAllUpstreamORFs(this, gene);
+			Iterator<UpstreamORF> orfIter = uorfs.sortedIterator();
+			while(orfIter.hasNext()) {
+				rtrn.add(orfIter.next());
+			}
+		}
+		return rtrn;
+	}
+	
+	/**
 	 * Write a bed file of all ORFs for genes in the bed file
 	 * @param inputBed Input bed file
 	 * @param outputBed Bed file to write
 	 * @throws IOException
 	 */
 	private void writeORFsToFile(String inputBed, String outputBed) throws IOException {
-		logger.info("");
-		logger.info("Writing all ORFs for genes in " + inputBed + " to file " + outputBed + "...");
 		AnnotationCollection<Gene> orfs = getAllORFsForGenes(inputBed);
+		writeToFile(orfs, outputBed);
+	}
+	
+	/**
+	 * Write a bed file of all ORFs for genes in the bed file
+	 * @param inputBed Input bed file
+	 * @param outputBed Bed file to write
+	 * @throws IOException
+	 */
+	private void writeUpstreamORFsToFile(String inputBed, String outputBed) throws IOException {
+		AnnotationCollection<Gene> orfs = getAllUpstreamORFsForGenes(inputBed);
+		writeToFile(orfs, outputBed);
+	}
+
+	private static void writeToFile(AnnotationCollection<Gene> orfs, String outputBed) throws IOException {
+		logger.info("");
+		logger.info("Writing " + orfs.getNumAnnotations() + " ORFs to file " + outputBed + "...");
 		BEDFileIO.writeToFile(orfs, outputBed);
-		logger.info("Wrote " + orfs.getNumAnnotations() + " ORFs.");
+		logger.info("Done writing bed file.");
 	}
 	
 	/**
@@ -156,14 +209,17 @@ public class ORFFinder {
 		p.addStringArg("-o", "Output bed file of ORFs to write", true);
 		p.addStringArg("-c", "Chromosome size file", true);
 		p.addStringArg("-g", "Genome fasta", true);
+		p.addBooleanArg("-u", "Only get upstream ORFs", false, false);
 		p.parse(args);
 		String inputBed = p.getStringArg("-i");
 		String outputBed = p.getStringArg("-o");
 		String chrSizeFile = p.getStringArg("-c");
 		String genomeFasta = p.getStringArg("-g");
+		boolean uorf = p.getBooleanArg("-u");
 		
 		ORFFinder of = new ORFFinder(genomeFasta, chrSizeFile);
-		of.writeORFsToFile(inputBed, outputBed);
+		if(uorf) of.writeUpstreamORFsToFile(inputBed, outputBed);
+		else of.writeORFsToFile(inputBed, outputBed);
 
 	}
 
