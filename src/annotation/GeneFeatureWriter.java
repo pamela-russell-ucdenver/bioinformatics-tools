@@ -226,6 +226,19 @@ public class GeneFeatureWriter {
 		return rtrn;
 	}
 	
+	/**
+	 * Write individual exons to bed file
+	 * @param inputBed Input bed
+	 * @param outputBed Output bed file of exons
+	 * @throws IOException
+	 */
+	public static void writeIndividualExons(String inputBed, String outputBed) throws IOException {
+		GeneFeatureWriter w = new GeneFeatureWriter(inputBed);
+		Collection<Gene> exons = w.getIndividualExons();
+		Collection<Annotation> e = new TreeSet<Annotation>();
+		e.addAll(exons);
+		w.writeAll(e, outputBed);
+	}
 	
 	private void writeAll(Collection<Annotation> features, String fileName) throws IOException {
 		logger.info("Writing " + features.size() + " genes to file " + fileName);
