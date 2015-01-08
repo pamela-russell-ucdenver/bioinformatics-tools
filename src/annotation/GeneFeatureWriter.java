@@ -77,6 +77,8 @@ public class GeneFeatureWriter {
 			Gene introns = gene.getIntrons();
 			if(introns != null) {
 				introns.setName(gene.getName() + "_all_introns");
+				introns.setCDSStart(introns.getStart());
+				introns.setCDSEnd(introns.getStart());
 				rtrn.add(introns);
 			}
 		}
