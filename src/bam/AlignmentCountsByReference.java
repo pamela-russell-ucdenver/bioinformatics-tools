@@ -70,7 +70,7 @@ public class AlignmentCountsByReference {
 		logger.info("Done making counts.");
 	}
 	
-	private void makeCountsBam() {
+	private void makeCountsBam(boolean primaryAlignmentsOnly) {
 		logger.info("Making counts...");
 		SAMFileReader reader = new SAMFileReader(new File(alignmentFile));
 		SAMRecordIterator iter = reader.iterator();
@@ -84,6 +84,9 @@ public class AlignmentCountsByReference {
 					logger.info("Finished " + numDone + " records.");
 				}
 				if(!record.getReadUnmappedFlag()) {
+					if(primaryAlignmentsOnly && record.getNotPrimaryAlignmentFlag()) {
+						continue;
+					}
 					incrementCount(record.getReferenceName());
 				}
 			} catch(SAMFormatException e) {
@@ -101,10 +104,12 @@ public class AlignmentCountsByReference {
 		p.addStringArg("-b", "Bam file", false, null);
 		p.addStringArg("-m", "Map alignment file", false, null);
 		p.addStringArg("-o", "Output table", true);
+		p.addBooleanArg("-p", "For bam file, count primary alignments only", false, false);
 		p.parse(args);
 		String bam = p.getStringArg("-b");
 		String out = p.getStringArg("-o");
 		String map = p.getStringArg("-m");
+		boolean primaryOnly = p.getBooleanArg("-p");
 		
 		if((bam == null && map == null) || (bam != null && map != null)) {
 			throw new IllegalArgumentException("Provide one: -b or -m");
@@ -115,7 +120,7 @@ public class AlignmentCountsByReference {
 		AlignmentCountsByReference b = new AlignmentCountsByReference(alignmentFile);
 		
 		if(bam != null) {
-			b.makeCountsBam();
+			b.makeCountsBam(primaryOnly);
 		} else {
 			b.makeCountsMap();
 		}

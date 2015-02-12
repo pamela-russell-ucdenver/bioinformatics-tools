@@ -45,27 +45,33 @@ public class FastaFilter {
 		}
 	}
 	
-	private static String getMatch(String longName, Collection<String> shortNames) {
+	private static String getMatch(String longName, Collection<String> shortNames, boolean exactMatch) {
 		for(String s : shortNames) {
-			if(longName.contains(s)) {
-				return s;
+			if(exactMatch) {
+				if(longName.equals(s)) {
+					return s;
+				}
+			} else {
+				if(longName.contains(s)) {
+					return s;
+				}
 			}
 		}
 		return null;
 	}
 	
-	private void keepByName(Collection<String> seqIdsToKeep) {
+	private void keepByName(Collection<String> seqIdsToKeep, boolean exactMatch) {
 		logger.info("Keeping sequences by name.");
 		List<Sequence> seqsToRemove = new ArrayList<Sequence>();
 		Collection<String> notYetFound = new TreeSet<String>();
 		notYetFound.addAll(seqIdsToKeep);
 		for(Sequence seq : sequences) {
 			String id = seq.getId();
-			if(getMatch(id, seqIdsToKeep) == null) {
+			if(getMatch(id, seqIdsToKeep, exactMatch) == null) {
 				logger.debug("Removing sequence " + id + " because name is not on list.");
 				seqsToRemove.add(seq);
 			} else {
-				notYetFound.remove(getMatch(id, seqIdsToKeep));
+				notYetFound.remove(getMatch(id, seqIdsToKeep, exactMatch));
 			}
 		}
 		for(String id : notYetFound) {
@@ -107,18 +113,20 @@ public class FastaFilter {
 		p.addIntArg("--minlen", "Min sequence length", false, 0);
 		p.addStringArg("--names", "File of sequence names to keep", false, null);
 		p.addStringArg("-o", "Output fasta file", true);
+		p.addBooleanArg("-e", "Exact name match for name filter (as opposed to contains)", false, true);
 		p.parse(args);
 		String inFasta = p.getStringArg("-i");
 		String outFasta = p.getStringArg("-o");
 		String namesFile = p.getStringArg("--names");
 		int minLen = p.getIntArg("--minlen");
+		boolean exactMatch = p.getBooleanArg("-e");
 		
 		FastaFilter ff = new FastaFilter(inFasta);
 		if(minLen > 0) {
 			ff.filterByMinLength(minLen);
 		}
 		if(namesFile != null) {
-			ff.keepByName(linesFromFile(namesFile));
+			ff.keepByName(linesFromFile(namesFile), exactMatch);
 		}
 		
 		ff.write(outFasta);
