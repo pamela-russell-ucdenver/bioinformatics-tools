@@ -3,12 +3,16 @@
  */
 package wig;
 
+import file.FileUtils;
 import guttmanlab.core.util.CommandLineParser;
 
+import java.io.BufferedReader;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -49,12 +53,22 @@ public class WigTools {
 	
 	/**
 	 * @param wigFile Input wig file
+	 * @throws IOException 
+	 */
+	public WigTools(String wigFile) throws IOException {
+		this(wigFile, null, null);
+	}
+	
+	/**
+	 * @param wigFile Input wig file
 	 * @param genomeFasta Genome fasta file
 	 * @param bedFile Bed file of genes to get orientations from
 	 * @throws IOException
 	 */
 	public WigTools(String wigFile, String genomeFasta, String bedFile) throws IOException {
-		transcribedRegions = new TranscribedRegions(genomeFasta, bedFile);
+		if(genomeFasta != null && bedFile != null) {
+			transcribedRegions = new TranscribedRegions(genomeFasta, bedFile);
+		}
 		// Read wig file
 		if(wigFile != null) {
 			wigReader = new WigReader(wigFile);
@@ -476,6 +490,31 @@ public class WigTools {
 	}
 	
 	/**
+	 * Write filtered wig file with only specified chromosomes
+	 * @param chrListFile File containing list of chromosomes to keep
+	 * @param outputWig Output wig file to write
+	 * @throws IOException
+	 */
+	private void writeWigFilteredByChrs(String chrListFile, String outputWig) throws IOException {
+		logger.info("");
+		logger.info("Writing wig data for chromosomes in " + chrListFile + " to file " + outputWig + "...");
+		BufferedReader b = new BufferedReader(new FileReader(chrListFile));
+		List<String> chrs = FileUtils.fileLinesAsList(chrListFile);
+		for(String chr : chrs) {
+			if(!wigData.containsKey(chr)) {
+				throw new IllegalArgumentException("Wig data does not contain key " + chr + ".");
+			}
+		}
+		FileWriter w = new FileWriter(outputWig);
+		for(String chr : chrs) {
+			logger.info(chr);
+			WigWriter.write(w, chr, wigData.get(chr), false);
+		}
+		w.close();
+		logger.info("Done writing filtered file.");
+	}
+	
+	/**
 	 * Intersect all genes with the wig data and write to a bed file
 	 * The bed lines are genes whose blocks consist of contiguous positions with wig value over the min, intersected with each gene
 	 * @param outBed Output bed file
@@ -517,12 +556,13 @@ public class WigTools {
 		description += "Task 5: write binary wig tracks of transcribed nucleotides at all exonic positions (requires -g, -b, -ob)\n";
 		description += "Task 6: write bed file of genes whose blocks consist of contiguous positions with wig value over a min value, intersected with each gene (requires -w, -g, -b, -mw, -id, -oi)\n";
 		description += "Task 7: write table of total dinucleotide counts (requires -w, -g, -b, -otd)\n";
+		description += "Task 8: write filtered wig file with specified chromosomes only (requires -w, -c, -ofc)\n";
 		
 		p.setProgramDescription(description);
 		p.addStringArg("-g", "For task 1, 2, 3, 5 or 7: genome fasta", false, null);
 		p.addStringArg("-b", "For task 1, 2, 3, 5 or 7: bed annotation", false, null);
 		p.addStringArg("-w2", "For task 4: other wig file to merge", false, null);
-		p.addStringArg("-w", "For task 1, 2, 3, 4, 6 or 7: input wig file", false, null);
+		p.addStringArg("-w", "For task 1, 2, 3, 4, 6, 7 or 8: input wig file", false, null);
 		p.addStringArg("-ot", "For task 1: output file for table of total base counts", false, null);
 		p.addStringArg("-on", "For task 2: prefix for separate output wig tracks for each nucleotide", false, null);
 		p.addStringArg("-os", "For task 3: output wig file where values have been shifted to a new position in direction of transcription, specified by an offset", false, null);
@@ -534,6 +574,8 @@ public class WigTools {
 		p.addStringArg("-oi", "For task 6: output bed file of genes intersected with wig data", false, null);
 		p.addStringArg("-otd", "For task 7: output file for table of total dinucleotide counts", false, null);
 		p.addIntArg("-wfd", "For task 7: first position of dinucleotide relative to wig position", false, 0);
+		p.addStringArg("-c", "For task 8: file containing list of chromosomes to keep", false, null);
+		p.addStringArg("-ofc", "For task 8: output wig file filtered by chromosomes", false, null);
 		
 		p.parse(args);
 		if(p.getFlagsAndValues().isEmpty()) {
@@ -555,6 +597,13 @@ public class WigTools {
 		String outIntersected = p.getStringArg("-oi");
 		String outDinucTable = p.getStringArg("-otd");
 		int dinucFirstPos = p.getIntArg("-wfd");
+		String chrsToKeep = p.getStringArg("-c");
+		String outChrFilteredWig = p.getStringArg("-ofc");
+		
+		if(wigFile != null && chrsToKeep != null && outChrFilteredWig != null) {
+			WigTools w = new WigTools(wigFile);
+			w.writeWigFilteredByChrs(chrsToKeep, outChrFilteredWig);
+		}
 		
 		if(outTable != null || outNucTracks != null || outShifted != null || outDinucTable != null) {
 			// Genome and annotation are needed
