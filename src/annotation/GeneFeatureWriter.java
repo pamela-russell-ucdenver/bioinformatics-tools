@@ -70,6 +70,20 @@ public class GeneFeatureWriter {
 		return rtrn;
 	}
 	
+	private Collection<Gene> getNonCodingRNAs() {
+		logger.info("Getting all non-coding genes...");
+		Collection<Gene> rtrn = new TreeSet<Gene>();
+		for(Gene gene : genes) {
+			if(!gene.isCodingGene()) {
+				Gene nc = gene.copy();
+				nc.setName(gene.getName() + "_noncoding");
+				rtrn.add(nc);
+			}
+		}
+		logger.info("Got " + rtrn.size() + " ncRNAs.");
+		return rtrn;
+	}
+	
 	private Collection<Gene> getAllIntronSets() {
 		logger.info("Getting sets of introns for all genes...");
 		Collection<Gene> rtrn = new TreeSet<Gene>();
@@ -267,6 +281,7 @@ public class GeneFeatureWriter {
 		p.addBooleanArg("--utr3", "Write 3'-UTRs", false, false);
 		p.addBooleanArg("--utr5", "Write 5'-UTRs", false, false);
 		p.addBooleanArg("--cds", "Write CDSs", false, false);
+		p.addBooleanArg("--nc", "Write original non-coding genes", false, false);
 		p.addBooleanArg("--eej", "Write window upstream of each exon exon junction", false, false);
 		p.addIntArg("--eejw", "Window size for -eej", false, 14);
 		p.addIntArg("--eejd", "Distance upstream of exon exon junction for --eej", false, 17);
@@ -286,6 +301,7 @@ public class GeneFeatureWriter {
 		boolean utr3 = p.getBooleanArg("--utr3");
 		boolean cds = p.getBooleanArg("--cds");
 		boolean utr5 = p.getBooleanArg("--utr5");
+		boolean nc = p.getBooleanArg("--nc");
 		boolean eej = p.getBooleanArg("--eej");
 		int eejw = p.getIntArg("--eejw");
 		int eejd = p.getIntArg("--eejd");
@@ -300,6 +316,7 @@ public class GeneFeatureWriter {
 		if(indExons) genesToWrite.addAll(gfw.getIndividualExons());
 		if(utr3) genesToWrite.addAll(gfw.getAll3UTRs());
 		if(utr5) genesToWrite.addAll(gfw.getAll5UTRs());
+		if(nc) genesToWrite.addAll(gfw.getNonCodingRNAs());
 		if(eej) genesToWrite.addAll(gfw.getWindowUpstreamOfEachExonExonJunction(eejw, eejd));
 		if(dtss) genesToWrite.addAll(gfw.getWindowDownstreamOfEachTSS(dtssw));
 		if(cds) genesToWrite.addAll(gfw.getAllCDSs());
