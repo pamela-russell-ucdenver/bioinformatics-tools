@@ -71,19 +71,33 @@ public class SelfDimer {
 	
 	public static void main(String[] args) throws IOException {
 		
-		CommandLineParser p = new CommandLineParser();
-		p.addStringArg("-i", "Input list of sequences", true);
-		p.addStringArg("-o", "Output file prefix", true);
-		p.addIntArg("-k", "Kmer length within sequence", false, -1);
-		p.addIntArg("-ks", "Kmer start within sequence", false, -1);
-		p.parse(args);
-		String input = p.getStringArg("-i");
-		String output = p.getStringArg("-o");
+//		CommandLineParser p = new CommandLineParser();
+//		p.addStringArg("-i", "Input list of sequences", true);
+//		p.addStringArg("-o", "Output file prefix", true);
+//		p.addIntArg("-k", "Kmer length within sequence", false, -1);
+//		p.addIntArg("-ks", "Kmer start within sequence", false, -1);
+//		p.parse(args);
+//		String input = p.getStringArg("-i");
+//		String output = p.getStringArg("-o");
+//		k = p.getIntArg("-k");
+//		kmerStart = p.getIntArg("-ks");
 		
-		k = p.getIntArg("-k");
-		kmerStart = p.getIntArg("-ks");
+		k = -1;
+		kmerStart = -1;
+		String dir = "/Users/prussell/Documents/lncRNA/3D_barcoding/Self_dimers_5_2_15/";
+		String evenTop = dir + "even_top_full.txt";
+		String evenBottom = dir + "even_bottom_full.txt";
+		String oddTop = dir + "odd_top_full.txt";
+		String oddBottom = dir + "odd_bottom_full.txt";
+		String evenTopOut = dir + "even_top_full_self_dimers";
+		String evenBottomOut = dir + "even_bottom_full_self_dimers";
+		String oddTopOut = dir + "odd_top_full_self_dimers";
+		String oddBottomOut = dir + "odd_bottom_full_self_dimers";
 		
-		printSelfAlignments(input, output);
+		printSelfAlignments(evenTop, evenTopOut);
+		printSelfAlignments(evenBottom, evenBottomOut);
+		printSelfAlignments(oddTop, oddTopOut);
+		printSelfAlignments(oddBottom, oddBottomOut);
 		
 	}
 	
