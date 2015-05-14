@@ -51,13 +51,20 @@ public class FastqReadLengthHistogram {
 		CommandLineParser p = new CommandLineParser();
 		p.addStringArg("-f", "fastq file", true);
 		p.addIntArg("-m", "max bin", true);
-		p.addStringArg("-o", "out histogram file", true);
+		p.addStringArg("-o", "out histogram file", false, null);
 		p.parse(args);
 		String fastq = p.getStringArg("-f");
 		int maxBin = p.getIntArg("-m");
 		String outFile = p.getStringArg("-o");
 		
-		writeHistogram(getDistribution(fastq, maxBin), outFile);
+		EmpiricalDistribution dist = getDistribution(fastq, maxBin);
+		
+		if(outFile != null) writeHistogram(dist, outFile);
+		
+		logger.info("");
+		logger.info("Median read size " + dist.getMedianOfAllDataValues());
+		logger.info("Mean read size " + dist.getMean());
+		logger.info("Standard deviation " + dist.getStandardDeviation());
 		
 		logger.info("");
 		logger.info("All done.");
