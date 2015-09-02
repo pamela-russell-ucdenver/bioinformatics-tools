@@ -1,10 +1,14 @@
 package rnaseq;
 
+import guttmanlab.core.annotation.MappedFragment;
+import guttmanlab.core.annotationcollection.AbstractAnnotationCollection;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -13,7 +17,6 @@ import org.apache.log4j.Logger;
 import broad.core.parser.CommandLineParser;
 import broad.core.parser.StringParser;
 import broad.pda.annotation.BEDFileParser;
-
 import nextgen.core.annotation.Annotation;
 import nextgen.core.annotation.Annotation.Strand;
 import nextgen.core.annotation.Gene;
@@ -22,12 +25,13 @@ public class MaxFragmentEndPileupFromPositionInfoTable {
 	
 	private StringParser stringParser;
 	private static Logger logger = Logger.getLogger(MaxFragmentEndPileupFromPositionInfoTable.class.getName());
+	protected static int MIN_PILEUP_SINGLE_POS = 10;
 	
-	private MaxFragmentEndPileupFromPositionInfoTable() {
+	protected MaxFragmentEndPileupFromPositionInfoTable() {
 		stringParser = new StringParser();
 	}
 	
-	private class PositionAndCount {
+	protected class PositionAndCount implements Comparable<PositionAndCount> {
 		
 		private String chr;
 		private int pos;
@@ -39,7 +43,6 @@ public class MaxFragmentEndPileupFromPositionInfoTable {
 			count = num;
 		}
 		
-		@SuppressWarnings("unused")
 		public String getChr() {
 			return chr;
 		}
@@ -48,9 +51,30 @@ public class MaxFragmentEndPileupFromPositionInfoTable {
 			return pos;
 		}
 		
-		@SuppressWarnings("unused")
 		public int getCount() {
 			return count;
+		}
+
+		@Override
+		public int compareTo(PositionAndCount o) {
+			int c = chr.compareTo(o.getChr());
+			if(c != 0) return c;
+			int p = pos - o.getPos();
+			if(p != 0) return p;
+			return count - o.getCount();
+		}
+		
+		@Override
+		public boolean equals(Object o) {
+			if(!o.getClass().equals(PositionAndCount.class)) return false;
+			PositionAndCount p = (PositionAndCount)o;
+			return chr.equals(p.getChr()) && pos == p.getPos() && count == p.getCount();
+		}
+		
+		@Override
+		public int hashCode() {
+			String s = chr + "_" + pos + "_" + count;
+			return s.hashCode();
 		}
 		
 	}
@@ -83,6 +107,18 @@ public class MaxFragmentEndPileupFromPositionInfoTable {
 		return pos >= start && pos < end;
 	}
 	
+	private boolean withinBlock(Annotation region, String tableLine) {
+		List<? extends Annotation> blocks = region.getBlocks();
+		int pos = getPos(tableLine);
+		for(Annotation block : blocks) {
+			if(withinSpan(block, tableLine)) {
+				return true;
+			} else {
+			}
+		}
+		return false;
+	}
+	
 	/**
 	 * Move the reader to the second line of the annotation and return the first line as a string
 	 * @param tableReader Buffered reader for position info table
@@ -103,23 +139,32 @@ public class MaxFragmentEndPileupFromPositionInfoTable {
 		throw new IllegalStateException("Never found span of " + region.getName());
 	}
 	
-	private Map<Integer, Integer> getCounts(Annotation region, String tableFile, int colNum) throws IOException {
+	protected Map<Integer, Integer> getCounts(Annotation region, String tableFile, int colNum, boolean spanInclIntrons) throws IOException {
 		Map<Integer, Integer> rtrn = new TreeMap<Integer, Integer>();
 		BufferedReader reader = new BufferedReader(new FileReader(tableFile));
 		String firstLine = seekToStartPos(reader, region);
-		rtrn.put(Integer.valueOf(getPos(firstLine)), Integer.valueOf(getCount(firstLine, colNum)));
+		if(!withinSpan(region, firstLine)) {
+			reader.close();
+			return rtrn;
+		}
+		if(spanInclIntrons || withinBlock(region, firstLine)) {
+			rtrn.put(Integer.valueOf(getPos(firstLine)), Integer.valueOf(getCount(firstLine, colNum)));
+		}
 		while(reader.ready()) {
 			String line = reader.readLine();
 			if(!withinSpan(region, line)) {
+				reader.close();
 				return rtrn;
 			}
+			if(!spanInclIntrons && !withinBlock(region, line)) continue;
 			rtrn.put(Integer.valueOf(getPos(line)), Integer.valueOf(getCount(line, colNum)));
 		}
+		reader.close();
 		return rtrn;
 	}
 	
-	private PositionAndCount getMaxPosition(Annotation region, String tableFile, int colNum) throws IOException {
-		Map<Integer, Integer> counts = getCounts(region, tableFile, colNum);
+	protected PositionAndCount getMaxPosition(Annotation region, String tableFile, int colNum, boolean spanInclIntrons) throws IOException {
+		Map<Integer, Integer> counts = getCounts(region, tableFile, colNum, spanInclIntrons);
 		int maxPos = Integer.MIN_VALUE;
 		int maxCount = Integer.MIN_VALUE;
 		for(Integer pos : counts.keySet()) {
@@ -159,8 +204,8 @@ public class MaxFragmentEndPileupFromPositionInfoTable {
 			logger.info(chr);
 			for(Gene gene : genes.get(chr)) {
 				try {
-					PositionAndCount p5p = m.getMaxPosition(gene, table, startersCol5p);
-					PositionAndCount p3p = m.getMaxPosition(gene, table, startersCol3p);
+					PositionAndCount p5p = m.getMaxPosition(gene, table, startersCol5p, true);
+					PositionAndCount p3p = m.getMaxPosition(gene, table, startersCol3p, true);
 					
 					int end5p = p5p.getPos();
 					int end3p = p3p.getPos();
