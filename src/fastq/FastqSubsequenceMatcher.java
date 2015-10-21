@@ -25,6 +25,7 @@ public class FastqSubsequenceMatcher {
 	private static Logger logger = Logger.getLogger(FastqSubsequenceMatcher.class.getName());
 	private Map<String, Double> matchCounts;
 	private BufferedWriter matchPctWriter;
+	private static String NO_MATCH = "NO_MATCH";
 	
 	/**
 	 * @param querySeqsFasta Fasta file of sequences to look for in reads
@@ -37,6 +38,7 @@ public class FastqSubsequenceMatcher {
 			String seqStr = seq.getName();
 			matchCounts.put(seqStr, Double.valueOf(0));
 		}
+		matchCounts.put(NO_MATCH, Double.valueOf(0));
 	}
 	
 	/**
@@ -56,6 +58,9 @@ public class FastqSubsequenceMatcher {
 				rtrn += seq.getName();
 				matchCounts.put(seq.getName(), Double.valueOf(matchCounts.get(seq.getName()).doubleValue()+1));
 			}
+		}
+		if(rtrn.equals("")) {
+			matchCounts.put(NO_MATCH, Double.valueOf(matchCounts.get(NO_MATCH).doubleValue()+1));
 		}
 		return rtrn;
 	}
@@ -78,7 +83,7 @@ public class FastqSubsequenceMatcher {
 		int numDone = 0;
 		while(iter.hasNext()) {
 			numDone++;
-			if(numDone % 10000 == 0) {
+			if(numDone % 1000 == 0) {
 				logger.info("Finished " + numDone + " reads.");
 				writeCounts(numDone);
 			}

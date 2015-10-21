@@ -30,6 +30,7 @@ public class ConvertVCFToTranscriptCoords {
 	
 	private OverlapUtils overlapUtils;
 	private Map<String, Sequence> transcriptSequences;
+	private String header;
 	private static Logger logger = Logger.getLogger(ConvertVCFToTranscriptCoords.class.getName());
 	
 	/**
@@ -83,9 +84,12 @@ public class ConvertVCFToTranscriptCoords {
 			String line = reader.readLine();
 			if(line.startsWith("#")) {
 				writer.write(line + "\n");
+				if(line.startsWith("#CHROM")) {
+					header = line;
+				}
 				continue;
 			}
-			VCFRecord record = new VCFRecord(line);
+			VCFRecord record = new VCFRecord(line, header);
 //			String origChr = record.getChrom();
 //			int origZeroBasedPos = record.getZeroBasedPos();
 //			String origRef = record.getRefAllele().getSequenceBases();

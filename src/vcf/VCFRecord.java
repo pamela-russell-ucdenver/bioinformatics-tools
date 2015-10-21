@@ -7,8 +7,10 @@ import guttmanlab.core.sequence.Sequence;
 import guttmanlab.core.util.StringParser;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.apache.log4j.Logger;
 
@@ -116,7 +118,9 @@ public class VCFRecord {
 	private double qual;
 	private String filter;
 	private String info;
-	private List<String> genotypes;
+	private String format;
+	private List<String> sampleIDs;
+	private Map<String, String> genotypes;
 	
 	private VCFRecord() {}
 	
@@ -141,8 +145,10 @@ public class VCFRecord {
 	
 	/**
 	 * @param line VCF file line
+	 * @param headerLine Header line beginning with #CHROM
 	 */
-	public VCFRecord(String line) {
+	public VCFRecord(String line, String headerLine) {
+		loadHeader(headerLine);
 		StringParser s = new StringParser();
 		s.parse(line);
 		chrom = s.asString(0);
@@ -153,9 +159,25 @@ public class VCFRecord {
 		qual = s.asDouble(5);
 		filter = s.asString(6);
 		info = s.asString(7);
-		genotypes = new ArrayList<String>();
-		for(int i = 8; i < s.getFieldCount(); i++) {
-			genotypes.add(s.asString(i));
+		genotypes = new HashMap<String, String>();
+		if(sampleIDs != null) {
+			format = s.asString(8);
+			if(s.getFieldCount() != sampleIDs.size() + 9) {
+				throw new IllegalArgumentException("Line must have 9 more fields (" + s.getFieldCount() +  ") than sample IDs (" + sampleIDs.size() + ")");
+			}
+			for(int i = 0; i < sampleIDs.size(); i++) {
+				genotypes.put(sampleIDs.get(i), s.asString(i + 9));
+			}
+		}
+	}
+	
+	private void loadHeader(String headerLine) {
+		StringParser p = new StringParser();
+		p.parse(headerLine);
+		if(p.getFieldCount() < 9) return;
+		sampleIDs = new ArrayList<String>();
+		for(int i = 9; i < p.getFieldCount(); i++) {
+			sampleIDs.add(p.asString(i));
 		}
 	}
 	
@@ -226,8 +248,11 @@ public class VCFRecord {
 	
 	public String toString() {
 		String rtrn = chrom + "\t" + pos + "\t" + id + "\t" + ref.getSequenceBases() + "\t" + alt.toString() + "\t" + qual + "\t" + filter + "\t" + info;
-		for(String genotype : genotypes) {
-			rtrn += "\t" + genotype;
+		if(sampleIDs != null) {
+			rtrn += "\t" + format;
+			for(String sample : sampleIDs) {
+				rtrn += "\t" + genotypes.get(sample);
+			}
 		}
 		return rtrn;
 	}
