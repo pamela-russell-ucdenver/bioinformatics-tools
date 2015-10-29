@@ -139,6 +139,8 @@ public class VCFRecord {
 		rtrn.qual = other.qual;
 		rtrn.filter = other.filter;
 		rtrn.info = other.info;
+		rtrn.format = other.format;
+		rtrn.sampleIDs = other.sampleIDs;
 		rtrn.genotypes = other.genotypes;
 		return rtrn;
 	}
@@ -159,6 +161,7 @@ public class VCFRecord {
 		qual = s.asDouble(5);
 		filter = s.asString(6);
 		info = s.asString(7);
+		format = s.asString(8);
 		genotypes = new HashMap<String, String>();
 		if(sampleIDs != null) {
 			format = s.asString(8);
