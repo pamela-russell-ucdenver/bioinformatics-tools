@@ -208,6 +208,7 @@ public class FilterBam {
 				numHitsMap.put(name, numHits);
 			}		
 		}
+		reader.close();
 		
 		//Write remainder
 		writeRemainder(tempCollection, writer);
