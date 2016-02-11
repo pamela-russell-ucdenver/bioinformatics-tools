@@ -7,6 +7,7 @@ import guttmanlab.core.sequence.Sequence;
 import guttmanlab.core.util.StringParser;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -19,7 +20,7 @@ import org.apache.log4j.Logger;
  * @author prussell
  *
  */
-public class VCFRecord {
+public final class VCFRecord implements Comparable<VCFRecord> {
 	
 	public static Logger logger = Logger.getLogger(VCFRecord.class.getName());
 	
@@ -54,12 +55,30 @@ public class VCFRecord {
 			
 		}
 		
+		
 		/**
 		 * @param singleAltSequence A single alternate sequence
 		 */
 		public AlternateAllele(Sequence singleAltSequence) {
 			alternateSeqs = new ArrayList<Sequence>();
 			alternateSeqs.add(singleAltSequence);
+		}
+		
+		public Collection<Sequence> getAltAlleles() {
+			return alternateSeqs;
+		}
+		
+		/**
+		 * @return The length common to all alternate sequences or throws exception if they have different lengths
+		 */
+		public int getLength() {
+			int rtrn = alternateSeqs.iterator().next().getLength();
+			for(Sequence seq : alternateSeqs) {
+				if(seq.getLength() != rtrn) {
+					throw new IllegalArgumentException("Alternate alleles have different lengths");
+				}
+			}
+			return rtrn;
 		}
 		
 		/**
@@ -72,18 +91,6 @@ public class VCFRecord {
 				throw new IllegalStateException("There is not exactly one alternate sequence");
 			}
 			return alternateSeqs.iterator().next();
-		}
-		
-		/**
-		 * If there is one alternate sequence, get its size
-		 * Otherwise throw an exception
-		 * @return The size of the only alternate sequence
-		 */
-		public int getSizeOfSingleSeq() {
-			if(alternateSeqs.size() != 1) {
-				throw new IllegalStateException("There is not exactly one alternate sequence");
-			}
-			return alternateSeqs.iterator().next().getSequenceBases().length();
 		}
 		
 		public String toString() {
@@ -126,22 +133,45 @@ public class VCFRecord {
 	
 	/**
 	 * Make a copy
-	 * @param other Other record
-	 * @return Copy of other record
+	 * @param record Record to copy
+	 * @return Copy of record
 	 */
-	public static VCFRecord copy(VCFRecord other) {
+	public static VCFRecord copy(VCFRecord record) {
 		VCFRecord rtrn = new VCFRecord();
-		rtrn.chrom = other.chrom;
-		rtrn.pos = other.pos;
-		rtrn.id = other.id;
-		rtrn.ref = other.ref;
-		rtrn.alt = other.alt;
-		rtrn.qual = other.qual;
-		rtrn.filter = other.filter;
-		rtrn.info = other.info;
-		rtrn.format = other.format;
-		rtrn.sampleIDs = other.sampleIDs;
-		rtrn.genotypes = other.genotypes;
+		rtrn.chrom = record.chrom;
+		rtrn.pos = record.pos;
+		rtrn.id = record.id;
+		rtrn.ref = record.ref;
+		rtrn.alt = record.alt;
+		rtrn.qual = record.qual;
+		rtrn.filter = record.filter;
+		rtrn.info = record.info;
+		rtrn.format = record.format;
+		rtrn.sampleIDs = record.sampleIDs;
+		rtrn.genotypes = record.genotypes;
+		return rtrn;
+	}
+	
+	/**
+	 * Make a modified copy with new chr and pos
+	 * @param record Record to copy and modify
+	 * @param newChr New chr
+	 * @param newPos New pos
+	 * @return Copy with fields modified
+	 */
+	public static VCFRecord modifiedCopy(VCFRecord record, String newChr, int newPos) {
+		VCFRecord rtrn = new VCFRecord();
+		rtrn.chrom = newChr;
+		rtrn.pos = newPos;
+		rtrn.id = record.id;
+		rtrn.ref = record.ref;
+		rtrn.alt = record.alt;
+		rtrn.qual = record.qual;
+		rtrn.filter = record.filter;
+		rtrn.info = record.info;
+		rtrn.format = record.format;
+		rtrn.sampleIDs = record.sampleIDs;
+		rtrn.genotypes = record.genotypes;
 		return rtrn;
 	}
 	
@@ -161,7 +191,10 @@ public class VCFRecord {
 		qual = s.asDouble(5);
 		filter = s.asString(6);
 		info = s.asString(7);
-		format = s.asString(8);
+		if(s.getFieldCount() > 8) {
+			// There are genotypes in the file
+			format = s.asString(8);
+		}
 		genotypes = new HashMap<String, String>();
 		if(sampleIDs != null) {
 			format = s.asString(8);
@@ -277,6 +310,18 @@ public class VCFRecord {
 		return new SingleInterval(chrom, pos, end, Strand.BOTH);
 	}
 	
+	public boolean isSNP() {
+		return ref.getLength() == 1 && alt.getLength() == 1;
+	}
+	
+	public boolean isInsertion() {
+		return ref.getLength() < alt.getLength();
+	}
+	
+	public boolean isDeletion() {
+		return ref.getLength() > alt.getLength();
+	}
+	
 	/**
 	 * Convert the entire record to transcript coordinates
 	 * @param record The record
@@ -320,7 +365,7 @@ public class VCFRecord {
 		 *  Get upstream base from transcript sequence
 		 */
 		int refSize = refAllele.size();
-		int altSize =  record.getAlternateAllele().getSizeOfSingleSeq();
+		int altSize =  record.getAlternateAllele().getLength();
 		if(refSize > 1 && altSize == 1 && strand.equals(Strand.NEGATIVE)) {
 			// Start of actual deleted region on genome is zeroBasedGenomeCoord + 1
 			// Deletion size is refSize - 1
@@ -366,6 +411,13 @@ public class VCFRecord {
 		}
 		rtrn.setZeroBasedPos(zeroBasedTranscriptCoord);
 		return rtrn;
+	}
+
+	@Override
+	public int compareTo(VCFRecord o) {
+		int chrCompare = getChrom().compareTo(o.getChrom());
+		if(chrCompare != 0) return chrCompare;
+		return getZeroBasedPos() - o.getZeroBasedPos();
 	}
 	
 }

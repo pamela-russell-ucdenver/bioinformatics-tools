@@ -10,6 +10,8 @@ import guttmanlab.core.annotation.predicate.SecondReadFilter;
 import guttmanlab.core.annotationcollection.AbstractAnnotationCollection;
 import guttmanlab.core.annotationcollection.AnnotationCollection;
 import guttmanlab.core.annotationcollection.BAMFragmentCollectionFactory;
+import guttmanlab.core.annotationcollection.BAMPairedFragmentCollection;
+import guttmanlab.core.annotationcollection.FilteredIterator;
 import guttmanlab.core.util.CommandLineParser;
 import guttmanlab.core.util.CountLogger;
 
@@ -19,6 +21,7 @@ import java.io.IOException;
 import java.util.Map;
 import java.util.TreeMap;
 
+import org.apache.log4j.Level;
 import org.apache.log4j.Logger;
 
 import net.sf.samtools.util.CloseableIterator;
@@ -37,6 +40,9 @@ public class BamPositionInfoTable {
 	 */
 	public static Map<Integer, Integer> getStartPosCounts(AbstractAnnotationCollection<? extends MappedFragment> data, 
 			Annotation region, boolean enforceSameOrientation) {
+		logger.debug("");
+		logger.debug("");
+		logger.debug("Getting start position counts for " + region.toBED());
 		CloseableIterator<? extends MappedFragment> iter = data.sortedIterator(region, false);
 		Map<Integer, Integer> rtrn = new TreeMap<Integer, Integer>();
 		Strand regionOrientation = region.getOrientation();
@@ -48,6 +54,7 @@ public class BamPositionInfoTable {
 		int numSkipped = 0;
 		while(iter.hasNext()) {
 			MappedFragment fragment = iter.next();
+			logger.debug("Next fragment\t" + fragment.toBED());
 			Strand orientation = fragment.getOrientation();
 			if(enforceSameOrientation && !orientation.equals(regionOrientation)) {
 				numSkipped++;
@@ -80,6 +87,7 @@ public class BamPositionInfoTable {
 				rtrn.put(key, Integer.valueOf(0));
 			}
 			rtrn.put(key, Integer.valueOf(rtrn.get(key).intValue() + 1));
+			logger.debug("Start pos: " + fragStart + " key,value: " + key.toString() + "," + rtrn.get(key).toString());
 		}
 		iter.close();
 		if(enforceSameOrientation) logger.info("Skipped " + numSkipped + " records that did not match orientation for " + region.getName());
@@ -147,8 +155,14 @@ public class BamPositionInfoTable {
 		p.addStringArg("-o", "Output table", true);
 		p.addBooleanArg("-eo", "Only count fragments mapped in same orientation as gene they overlap", true);
 		p.addBooleanArg("-se", "Force single end interpretation of mappings", true);
+		p.addBooleanArg("-d", "Debug logging", false, false);
 		p.addBooleanArg("-r2", "Count read 2 only", true);
 		p.parse(args);
+		if(p.getBooleanArg("-d")) {
+			BAMPairedFragmentCollection.logger.setLevel(Level.DEBUG);
+			FilteredIterator.logger.setLevel(Level.DEBUG);
+			logger.setLevel(Level.DEBUG);
+		}
 		String bamFile = p.getStringArg("-bam");
 		String regionBed = p.getStringArg("-bed");
 		String chrSizeFile = p.getStringArg("-c");

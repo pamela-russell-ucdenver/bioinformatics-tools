@@ -1,10 +1,14 @@
 package fastq;
 
+import guttmanlab.core.alignment.LocalAlignmentUtils;
 import guttmanlab.core.alignment.SmithWatermanAlignment;
 import guttmanlab.core.util.CommandLineParser;
+import guttmanlab.core.util.StringParser;
 
+import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.Collection;
@@ -18,7 +22,6 @@ import nextgen.core.utils.FileUtil;
 
 import org.apache.log4j.Logger;
 
-import bitap.Bitap;
 import broad.core.sequence.Sequence;
 import broad.pda.seq.fastq.FastqParser;
 import broad.pda.seq.fastq.FastqSequence;
@@ -45,6 +48,7 @@ public class PairedEndBarcodeSplitter {
 	private FastqParser fastq2parser; // Read2 fastq reader
 	private BarcodeMatcher matcher; // Barcode matcher implementation
 	
+	@SuppressWarnings("unused")
 	private static Character[] alphabet = {'A', 'C', 'G', 'T', 'N'};
 	
 	private static Logger logger = Logger.getLogger(PairedEndBarcodeSplitter.class.getName());
@@ -75,6 +79,27 @@ public class PairedEndBarcodeSplitter {
 			}
 		}
 		
+		/**
+		 * Get instance based on string name
+		 * @param str Name
+		 * @return Instance corresponding to name
+		 */
+		public static Mate fromString(String str) {
+			if(str.equals(MATE1.toString())) {
+				return MATE1;
+			}
+			if(str.equals(MATE2.toString())) {
+				return MATE2;
+			}
+			if(str.equals(BOTH.toString())) {
+				return BOTH;
+			}
+			if(str.equals(NEITHER.toString())) {
+				return NEITHER;
+			}
+			throw new IllegalArgumentException("Not implemented for " + str);
+		}
+		
 	}
 	
 	/**
@@ -94,7 +119,7 @@ public class PairedEndBarcodeSplitter {
 		resetWriters();
 	}
 	
-	public PairedEndBarcodeSplitter() {}
+	private PairedEndBarcodeSplitter() {}
 
 	/**
 	 * Reset all the file writers
@@ -257,6 +282,110 @@ public class PairedEndBarcodeSplitter {
 		
 	}
 	
+	private static Map<String, Integer> posMapFromFile(String file) throws IOException {
+		BufferedReader b = new BufferedReader(new FileReader(file));
+		StringParser s = new StringParser();
+		Map<String, Integer> rtrn = new HashMap<String, Integer>();
+		while(b.ready()) {
+			s.parse(b.readLine());
+			if(s.getFieldCount() != 2) {
+				b.close();
+				throw new IllegalArgumentException("Line format: string   int");
+			}
+			rtrn.put(s.asString(0), Integer.valueOf(s.asInt(1)));
+		}
+		b.close();
+		return rtrn;
+	}
+
+	
+	/**
+	 * All barcodes are in one mate or the other
+	 * Each barcode has a known position where it appears in the reads
+	 * Different barcodes can have different positions
+	 * @author prussell
+	 *
+	 */
+	private class OneMateContainsBarcodesAtKnownPositions implements BarcodeMatcher {
+		
+		private Mate mateWithBarcode;
+		private Map<String, Integer> barcodePositions;
+		private int maxMismatches;
+		
+		public OneMateContainsBarcodesAtKnownPositions(Mate mateContainingBarcode, String barcodeFile, int maxMismatch) throws IOException {
+			this(mateContainingBarcode, posMapFromFile(barcodeFile), maxMismatch);
+		}
+		
+		public OneMateContainsBarcodesAtKnownPositions(Mate mateContainingBarcode, Map<String, Integer> barcodePos, int maxMismatch) {
+			if(mateContainingBarcode != Mate.MATE1 && mateContainingBarcode != Mate.MATE2) {
+				throw new IllegalArgumentException("Mate must be mate1 or mate2");
+			}
+			mateWithBarcode = mateContainingBarcode;
+			barcodePositions = barcodePos;
+			maxMismatches = maxMismatch;
+		}
+		
+		
+		@Override
+		public boolean readHasBarcode(FastqSequence read, String barcode) {
+			throw new IllegalArgumentException("Not implemented because can't identify whether read is mate 1 or 2");
+		}
+
+		@Override
+		public String identifyBarcode(FastqSequence read1, FastqSequence read2) {
+			String seq = mateWithBarcode == Mate.MATE1 ? read1.getSequence() : read2.getSequence();
+			boolean found = false;
+			String[] rtrn = new String[1];
+			for(String barcode : barcodePositions.keySet()) {
+				if(LocalAlignmentUtils.containsFullLengthUngappedMatchAtPosition(seq, barcode, barcodePositions.get(seq).intValue(), maxMismatches, true)) {
+					if(found) {
+						throw new IllegalStateException("Multiple barcodes match sequence " + seq + " at position " + barcodePositions.get(seq).toString() + " with " + maxMismatches + " allowable mismatches");
+					}
+					rtrn[0] = barcode;
+				}
+			}
+			return rtrn[0];
+		}
+
+		@Override
+		public void initializeBarcodes(PairedEndBarcodeSplitter barcodeSplitter) throws IOException {
+			throw new UnsupportedOperationException("Not implemented");
+		}
+
+		@Override
+		public FastqSequence getRead1SeqToWrite(FastqSequence read1, String barcode) {
+			if(mateWithBarcode == Mate.MATE2) {
+				return read1;
+			}
+			return trimReads ? trimRead1(read1, barcode) : read1;
+		}
+
+		@Override
+		public FastqSequence getRead2SeqToWrite(FastqSequence read2, String barcode) {
+			if(mateWithBarcode == Mate.MATE1) {
+				return read2;
+			}
+			return trimReads ? trimRead2(read2, barcode) : read2;
+		}
+
+		@Override
+		public FastqSequence trimRead1(FastqSequence read1, String barcode) {
+			if(mateWithBarcode == Mate.MATE2) {
+				return read1;
+			}
+			return getSequenceAfterUngappedMatch(read1, barcode, barcodePositions.get(barcode), maxMismatches);
+		}
+
+		@Override
+		public FastqSequence trimRead2(FastqSequence read2, String barcode) {
+			if(mateWithBarcode == Mate.MATE1) {
+				return read2;
+			}
+			return getSequenceAfterUngappedMatch(read2, barcode, barcodePositions.get(barcode), maxMismatches);
+		}
+		
+	}
+	
 	/**
 	 * Barcode matcher where either read1 or read2 contains a mate-specific barcode, but not both
 	 * E.g. RNA and DNA have separate barcode ligations on different ends of the molecule;
@@ -264,24 +393,31 @@ public class PairedEndBarcodeSplitter {
 	 * @author prussell
 	 *
 	 */
-	private class OneMateContainsBarcode implements BarcodeMatcher {
+	@SuppressWarnings("unused")
+	private class EitherMateContainsBarcode implements BarcodeMatcher {
 		
 		protected Map<Mate, String> mateSpecificBarcode;
 		protected int maxMismatchRead1barcode;
 		protected int maxMismatchRead2barcode;
+		protected boolean read1barcodeRC;
+		protected boolean read2barcodeRC;
 		
 		/**
 		 * @param mate1barcode Barcode that can be contained in read1
 		 * @param mate2barcode Barcode that can be contained in read2
 		 * @param maxMismatchMate1barcode Max mismatch in read1 barcode
 		 * @param maxMismatchMate2barcode Max mismatch in read2 barcode
+		 * @param mate1barcodeRC Whether read1 barcode appears reverse complemented in read1 sequence
+		 * @param mate2barcodeRC Whether read2 barcode appears reverse complemented in read2 sequence
 		 */
-		public OneMateContainsBarcode(String mate1barcode, String mate2barcode, int maxMismatchMate1barcode, int maxMismatchMate2barcode) {
+		public EitherMateContainsBarcode(String mate1barcode, String mate2barcode, int maxMismatchMate1barcode, int maxMismatchMate2barcode, boolean mate1barcodeRC, boolean mate2barcodeRC) {
 			mateSpecificBarcode = new HashMap<Mate, String>();
 			mateSpecificBarcode.put(Mate.MATE1, mate1barcode);
 			mateSpecificBarcode.put(Mate.MATE2, mate2barcode);
 			maxMismatchRead1barcode = maxMismatchMate1barcode;
 			maxMismatchRead2barcode = maxMismatchMate2barcode;
+			read1barcodeRC = mate1barcodeRC;
+			read2barcodeRC = mate2barcodeRC;
 		}
 		
 		@Override
@@ -300,10 +436,28 @@ public class PairedEndBarcodeSplitter {
 			return SmithWatermanAlignment.containsFullLengthUngappedMatch(read.getSequence(), barcode, maxMismatches);
 		}
 		
+		/**
+		 * @return Barcode to look for in mate 1: the mate 1 barcode or its reverse complement depending on the boolean parameter
+		 */
+		protected String mate1barcodeOrRC() {
+			if(read1barcodeRC) {
+				return Sequence.reverseSequence(mateSpecificBarcode.get(Mate.MATE1));
+			} else return mateSpecificBarcode.get(Mate.MATE1);
+		}
+		
+		/**
+		 * @return Barcode to look for in mate 2: the mate 2 barcode or its reverse complement depending on the boolean parameter
+		 */
+		protected String mate2barcodeOrRC() {
+			if(read2barcodeRC) {
+				return Sequence.reverseSequence(mateSpecificBarcode.get(Mate.MATE2));
+			} else return mateSpecificBarcode.get(Mate.MATE2);
+		}
+		
 		@Override
 		public String identifyBarcode(FastqSequence read1, FastqSequence read2) {
-			boolean read1hasSpecificBarcode = readHasBarcode(read1, mateSpecificBarcode.get(Mate.MATE1), maxMismatchRead1barcode);
-			boolean read2hasSpecificBarcode = readHasBarcode(read2, Sequence.reverseSequence(mateSpecificBarcode.get(Mate.MATE2)), maxMismatchRead2barcode);
+			boolean read1hasSpecificBarcode = readHasBarcode(read1, mate1barcodeOrRC(), maxMismatchRead1barcode);
+			boolean read2hasSpecificBarcode = readHasBarcode(read2, mate2barcodeOrRC(), maxMismatchRead2barcode);
 			if(read1hasSpecificBarcode) {
 				if(read2hasSpecificBarcode) {
 					return Mate.BOTH.toString();
@@ -346,78 +500,6 @@ public class PairedEndBarcodeSplitter {
 		
 	}
 		
-	/**
-	 * Trim reads for the Dec 2015 design with RNA and DNA specific adapter ligations
-	 * @author prussell
-	 *
-	 */
-	private class RnaDnaBarcodeDec2015 extends OneMateContainsBarcode {
-		
-		/**
-		 * @param mate1barcode DPM sequence (the sequence that can be in read1)
-		 * @param mate2barcode RPM sequence (the sequence that can be in read2)
-		 * @param maxMismatchMate1barcode Max mismatch DPM
-		 * @param maxMismatchMate2barcode Max mismatch RPM
-		 */
-		public RnaDnaBarcodeDec2015(String mate1barcode, String mate2barcode, int maxMismatchMate1barcode, int maxMismatchMate2barcode) {
-			super(mate1barcode, mate2barcode, maxMismatchMate1barcode, maxMismatchMate2barcode);
-		}
-
-		@Override
-		public FastqSequence getRead1SeqToWrite(FastqSequence read1, String barcode) {
-			return trimReads ? trimRead1(read1, barcode) : read1;
-		}
-
-		@Override
-		public FastqSequence getRead2SeqToWrite(FastqSequence read2, String barcode) {
-			return trimReads ? trimRead2(read2, barcode) : read2;
-		}
-		
-		
-		@Override
-		public FastqSequence trimRead1(FastqSequence read1, String barcode) {
-			Bitap bitap = new Bitap(barcode, read1.getSequence(), alphabet);
-			List<Integer> matches = bitap.wuManber(maxMismatchRead1barcode);
-			if(barcode.equals(mateSpecificBarcode.get(Mate.MATE1))) {
-				// Pair has been identified as containing DPM
-				// Want the sequence between two occurrences of DPM
-				return getSeqBetweenTwoUngappedMatchesOrAfterOneMatch(read1, barcode, matches, maxMismatchRead1barcode);
-			}
-			if(barcode.equals(mateSpecificBarcode.get(Mate.MATE2))) {
-				// Pair has been identified as containing RPM
-				if(matches.isEmpty() || matches.size() > 1) {
-					throw new IllegalStateException("Wrong number of matches (!=1) of barcode " + barcode + " to read " + read1.getSequence());
-				}
-				// Take the part of the read before the first match of RPM
-				return getSequenceBeforeUngappedMatch(read1, barcode, matches.iterator().next().intValue(), maxMismatchRead1barcode);
-			}
-			throw new IllegalArgumentException("Barcode must be read1 barcode or read2 barcode");
-		}
-
-		@Override
-		public FastqSequence trimRead2(FastqSequence read2, String barcode) {
-			// Don't trim read2; keep the barcodes
-			return read2;
-//			String barcodeRC = Sequence.reverseSequence(barcode);
-//			Bitap bitap = new Bitap(barcodeRC, read2.getSequence(), alphabet);
-//			List<Integer> matches = bitap.wuManber(maxMismatchRead1barcode);
-//			if(barcode.equals(mateSpecificBarcode.get(Mate.MATE1))) {
-//				// Pair has been identified as containing DPM
-//				// Want the sequence between two occurrences of DPM reverse complement
-//				return getSeqBetweenTwoUngappedMatchesOrAfterOneMatch(read2, barcodeRC, matches, maxMismatchRead1barcode);
-//			}
-//			if(barcode.equals(mateSpecificBarcode.get(Mate.MATE2))) {
-//				// Pair has been identified as containing RPM
-//				if(matches.isEmpty() || matches.size() > 1) {
-//					throw new IllegalStateException("Wrong number of matches (!=1) of barcode " + barcodeRC + " to read " + read2.getSequence());
-//				}
-//				// Take the part of the read after the first match of RPM reverse complement
-//				return getSequenceAfterUngappedMatch(read2, barcodeRC, matches.iterator().next().intValue(), maxMismatchRead1barcode);
-//			}
-//			throw new IllegalArgumentException("Barcode must be read1 barcode or read2 barcode");
-		}
-		
-	}
 	
 	/**
 	 * Check whether a fastq record contains a perfect match of a sequence
@@ -491,17 +573,17 @@ public class PairedEndBarcodeSplitter {
 	private enum MatchImplementation {
 		
 		PERFECT_MATCH,
-		ONE_MATE_CONTAINS_BARCODE,
-		RNA_DNA_BARCODE_DEC_2015;
+		EITHER_MATE_CONTAINS_BARCODE,
+		ONE_MATE_CONTAINS_BARCODES_AT_KNOWN_POSITIONS;
 		
 		public String toString() {
 			switch(this) {
-			case ONE_MATE_CONTAINS_BARCODE:
-				return "one_mate_contains_barcode";
+			case EITHER_MATE_CONTAINS_BARCODE:
+				return "either_mate_contains_barcode";
 			case PERFECT_MATCH:
 				return "perfect_match";
-			case RNA_DNA_BARCODE_DEC_2015:
-				return "rna_dna_barcode_dec_2015";
+			case ONE_MATE_CONTAINS_BARCODES_AT_KNOWN_POSITIONS:
+				return "one_mate_contains_barcodes_at_known_positions";
 			default:
 				throw new IllegalArgumentException("Not implemented");
 			}
@@ -511,11 +593,11 @@ public class PairedEndBarcodeSplitter {
 			if(s.equals(PERFECT_MATCH.toString())) {
 				return PERFECT_MATCH;
 			}
-			if(s.equals(ONE_MATE_CONTAINS_BARCODE.toString())) {
-				return ONE_MATE_CONTAINS_BARCODE;
+			if(s.equals(EITHER_MATE_CONTAINS_BARCODE.toString())) {
+				return EITHER_MATE_CONTAINS_BARCODE;
 			}
-			if(s.equals(RNA_DNA_BARCODE_DEC_2015.toString())) {
-				return RNA_DNA_BARCODE_DEC_2015;
+			if(s.equals(ONE_MATE_CONTAINS_BARCODES_AT_KNOWN_POSITIONS.toString())) {
+				return ONE_MATE_CONTAINS_BARCODES_AT_KNOWN_POSITIONS;
 			}
 			throw new IllegalArgumentException("Not implemented");
 		}
@@ -537,52 +619,37 @@ public class PairedEndBarcodeSplitter {
 	 * Get barcode matcher object specified on the command line
 	 * @param p Command line parser
 	 * @return Barcode matcher object
+	 * @throws IOException 
 	 */
-	private static BarcodeMatcher getBarcodeMatcher(CommandLineParser p) {
-		String barcodeFile = p.getStringArg(perfectMatchBarcodeFileOption);
+	private static BarcodeMatcher getBarcodeMatcher(CommandLineParser p) throws IOException {
+		String perfectMatchBarcodeFile = p.getStringArg(perfectMatchBarcodeFileOption);
 		String barcodeImpl = p.getStringArg(barcodeMatcherOption);
 		boolean perfectMatchRead1hasBarcode = p.getBooleanArg(perfectMatchBarcodeOnRead1Option);
-		String mate1barcode = p.getStringArg(oneMateContainsBarcodeMate1BarcodeOption);
-		String mate2barcode = p.getStringArg(oneMateContainsBarcodeMate2BarcodeOption);
-		int maxMismatchMate1barcode = p.getIntArg(oneMateContainsBarcodeMaxMismatchRead1Option);
-		int maxMismatchMate2barcode = p.getIntArg(oneMateContainsBarcodeMaxMismatchRead2Option);
+		String oneMateKnownPositionsBarcodeFile = p.getStringArg(oneMateKnownPositionsFileOption);
+		String oneMateKnownPositionsMate = p.getStringArg(oneMateKnownPositionsMateOption);
+		int oneMateKnownPositionsMaxMismatch = p.getIntArg(oneMateKnownPositionsMaxMismatchOption);
 		
 		MatchImplementation implementation = MatchImplementation.fromString(barcodeImpl);
 		
 		switch(implementation) {
-		case ONE_MATE_CONTAINS_BARCODE:
-			if(mate1barcode == null) {
-				throw new IllegalArgumentException("Must provide " + oneMateContainsBarcodeMate1BarcodeOption);
+		case EITHER_MATE_CONTAINS_BARCODE:
+			throw new UnsupportedOperationException("Not implemented");
+		case ONE_MATE_CONTAINS_BARCODES_AT_KNOWN_POSITIONS:
+			if(oneMateKnownPositionsBarcodeFile == null) {
+				throw new IllegalArgumentException("Must provide " + oneMateKnownPositionsFileOption);
 			}
-			if(mate2barcode == null) {
-				throw new IllegalArgumentException("Must provide " + oneMateContainsBarcodeMate2BarcodeOption);
+			if(oneMateKnownPositionsMate == null) {
+				throw new IllegalArgumentException("Must provide " + oneMateKnownPositionsMateOption);
 			}
-			if(maxMismatchMate1barcode < 0) {
-				throw new IllegalArgumentException("Must provide " + oneMateContainsBarcodeMaxMismatchRead1Option);
+			if(oneMateKnownPositionsMaxMismatch < 0) {
+				throw new IllegalArgumentException("Must provide " + oneMateKnownPositionsMaxMismatchOption);
 			}
-			if(maxMismatchMate2barcode < 0) {
-				throw new IllegalArgumentException("Must provide " + oneMateContainsBarcodeMaxMismatchRead2Option);
-			}
-			return new PairedEndBarcodeSplitter().new OneMateContainsBarcode(mate1barcode, mate2barcode, maxMismatchMate1barcode, maxMismatchMate2barcode);
-		case RNA_DNA_BARCODE_DEC_2015:
-			if(mate1barcode == null) {
-				throw new IllegalArgumentException("Must provide " + oneMateContainsBarcodeMate1BarcodeOption);
-			}
-			if(mate2barcode == null) {
-				throw new IllegalArgumentException("Must provide " + oneMateContainsBarcodeMate2BarcodeOption);
-			}
-			if(maxMismatchMate1barcode < 0) {
-				throw new IllegalArgumentException("Must provide " + oneMateContainsBarcodeMaxMismatchRead1Option);
-			}
-			if(maxMismatchMate2barcode < 0) {
-				throw new IllegalArgumentException("Must provide " + oneMateContainsBarcodeMaxMismatchRead2Option);
-			}
-			return new PairedEndBarcodeSplitter().new RnaDnaBarcodeDec2015(mate1barcode, mate2barcode, maxMismatchMate1barcode, maxMismatchMate2barcode);
+			return new PairedEndBarcodeSplitter().new OneMateContainsBarcodesAtKnownPositions(Mate.fromString(oneMateKnownPositionsMate), oneMateKnownPositionsBarcodeFile, oneMateKnownPositionsMaxMismatch);
 		case PERFECT_MATCH:
-			if(barcodeFile == null) {
+			if(perfectMatchBarcodeFile == null) {
 				throw new IllegalArgumentException("Must provide " + perfectMatchBarcodeFileOption);
 			}
-			return new PairedEndBarcodeSplitter().new PerfectMatch(barcodeFile, perfectMatchRead1hasBarcode);
+			return new PairedEndBarcodeSplitter().new PerfectMatch(perfectMatchBarcodeFile, perfectMatchRead1hasBarcode);
 		default:
 			throw new IllegalArgumentException("Not implemented: " + implementation.toString());
 		}
@@ -595,10 +662,13 @@ public class PairedEndBarcodeSplitter {
 	private static String perfectMatchBarcodeOnRead1Option = "-pmb1";
 	private static String trimReadsOption = "-rb";
 	private static String barcodeMatcherOption = "-bmi";
-	private static String oneMateContainsBarcodeMate1BarcodeOption = "-omb1";
-	private static String oneMateContainsBarcodeMate2BarcodeOption = "-omb2";
-	private static String oneMateContainsBarcodeMaxMismatchRead1Option = "-omm1";
-	private static String oneMateContainsBarcodeMaxMismatchRead2Option = "-omm2";
+	private static String eitherMateContainsBarcodeMate1BarcodeOption = "-emb1";
+	private static String eitherMateContainsBarcodeMate2BarcodeOption = "-emb2";
+	private static String eitherMateContainsBarcodeMaxMismatchRead1Option = "-emm1";
+	private static String eitherMateContainsBarcodeMaxMismatchRead2Option = "-emm2";
+	private static String oneMateKnownPositionsFileOption = "-omkpbf";
+	private static String oneMateKnownPositionsMateOption = "-omkpm";
+	private static String oneMateKnownPositionsMaxMismatchOption = "-omkpmm";
 	
 	/**
 	 * Get the part of the read before an ungapped match of the barcode
@@ -610,8 +680,9 @@ public class PairedEndBarcodeSplitter {
 	 * @param maxMismatches Max mismatches
 	 * @return The part of the read before the match
 	 */
+	@SuppressWarnings("unused")
 	private static FastqSequence getSequenceBeforeUngappedMatch(FastqSequence read, String barcode, int matchStart, int maxMismatches) {
-		if(!SmithWatermanAlignment.containsFullLengthUngappedMatch(read.getSequence(), barcode, matchStart, maxMismatches)) {
+		if(!LocalAlignmentUtils.containsFullLengthUngappedMatchAtPosition(read.getSequence(), barcode, matchStart, maxMismatches, true)) {
 			throw new IllegalArgumentException("No ungapped match of " + barcode + " to " + read.getSequence() + " at position " + 
 					matchStart + " with at most " + maxMismatches + " mismatches.");
 		}
@@ -629,7 +700,7 @@ public class PairedEndBarcodeSplitter {
 	 * @return The part of the read after the match
 	 */
 	private static FastqSequence getSequenceAfterUngappedMatch(FastqSequence read, String barcode, int matchStart, int maxMismatches) {
-		if(!SmithWatermanAlignment.containsFullLengthUngappedMatch(read.getSequence(), barcode, matchStart, maxMismatches)) {
+		if(!LocalAlignmentUtils.containsFullLengthUngappedMatchAtPosition(read.getSequence(), barcode, matchStart, maxMismatches, true)) {
 			throw new IllegalArgumentException("No ungapped match of " + barcode + " to " + read.getSequence() + " at position " + 
 					matchStart + " with at most " + maxMismatches + " mismatches.");
 		}
@@ -649,11 +720,11 @@ public class PairedEndBarcodeSplitter {
 	 */
 	private static FastqSequence getSequenceBetweenTwoUngappedMatches(FastqSequence read, String barcode, int match1start, int match2start, int maxMismatches) {
 		// Check that the two matches exist
-		if(!SmithWatermanAlignment.containsFullLengthUngappedMatch(read.getSequence(), barcode, match1start, maxMismatches)) {
+		if(!LocalAlignmentUtils.containsFullLengthUngappedMatchAtPosition(read.getSequence(), barcode, match1start, maxMismatches, true)) {
 			throw new IllegalArgumentException("No ungapped match of " + barcode + " to " + read.getSequence() + " at position " + 
 					match1start + " with at most " + maxMismatches + " mismatches.");
 		}
-		if(!SmithWatermanAlignment.containsFullLengthUngappedMatch(read.getSequence(), barcode, match2start, maxMismatches)) {
+		if(!LocalAlignmentUtils.containsFullLengthUngappedMatchAtPosition(read.getSequence(), barcode, match2start, maxMismatches, true)) {
 			throw new IllegalArgumentException("No ungapped match of " + barcode + " to " + read.getSequence() + " at position " + 
 					match2start + " with at most " + maxMismatches + " mismatches.");
 		}
@@ -679,6 +750,7 @@ public class PairedEndBarcodeSplitter {
 	 * @param maxMismatches Max mismatches
 	 * @return The part of the read between the two barcode matches or after the one
 	 */
+	@SuppressWarnings("unused")
 	private static FastqSequence getSeqBetweenTwoUngappedMatchesOrAfterOneMatch(FastqSequence read, String barcode, List<Integer> matchStarts, int maxMismatches) {
 		if(matchStarts.isEmpty()) {
 			throw new IllegalStateException("No matches of " + barcode + " to read " + read.getSequence());
@@ -712,10 +784,13 @@ public class PairedEndBarcodeSplitter {
 		p.addBooleanArg(perfectMatchBarcodeOnRead1Option, "For perfect match implementation, true if barcode is on read1, false if read2", false, true);
 		p.addBooleanArg(trimReadsOption, "Trim reads according to barcode matching implementation", false, true);
 		p.addStringArg(barcodeMatcherOption, "Barcode matcher implementation. Options: " + MatchImplementation.commaSeparatedList(), true);
-		p.addStringArg(oneMateContainsBarcodeMate1BarcodeOption, "For one mate implementation, read1 barcode", false, null);
-		p.addStringArg(oneMateContainsBarcodeMate2BarcodeOption, "For one mate implementation, read2 barcode", false, null);
-		p.addIntArg(oneMateContainsBarcodeMaxMismatchRead1Option, "For one mate implementation, max mismatches in read 1 barcode", false, -1);
-		p.addIntArg(oneMateContainsBarcodeMaxMismatchRead2Option, "For one mate implementation, max mismatches in read 2 barcode", false, -1);
+		p.addStringArg(eitherMateContainsBarcodeMate1BarcodeOption, "For either mate implementation, read1 barcode", false, null);
+		p.addStringArg(eitherMateContainsBarcodeMate2BarcodeOption, "For either mate implementation, read2 barcode", false, null);
+		p.addIntArg(eitherMateContainsBarcodeMaxMismatchRead1Option, "For either mate implementation, max mismatches in read 1 barcode", false, -1);
+		p.addIntArg(eitherMateContainsBarcodeMaxMismatchRead2Option, "For either mate implementation, max mismatches in read 2 barcode", false, -1);
+		p.addStringArg(oneMateKnownPositionsFileOption, "For one mate known positions implementation, file of barcode and position in read (line format: barcode   position)", false, null);
+		p.addStringArg(oneMateKnownPositionsMateOption, "For one mate known positions implementation, mate containing barcode. Options: " + Mate.MATE1.toString() + "," + Mate.MATE2.toString(), false, null);
+		p.addIntArg(oneMateKnownPositionsMaxMismatchOption, "For one mate known positions implementation, max mismatches in barcode", false, -1);
 		p.parse(args);
 		String read1fastq = p.getStringArg("-f1");
 		String read2fastq = p.getStringArg("-f2");
