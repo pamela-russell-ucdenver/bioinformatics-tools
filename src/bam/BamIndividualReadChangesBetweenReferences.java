@@ -8,11 +8,13 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
 import org.apache.log4j.Logger;
 
+import net.sf.samtools.SAMFileHeader;
 import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMRecordIterator;
@@ -89,9 +91,16 @@ public class BamIndividualReadChangesBetweenReferences {
 	 * @return For each ordered pair, number of times a query has it (one member of pair in one bam file, missing other member in other bam file)
 	 */
 	private static Map<StringOrderedPair, Integer> targetShiftCounts(String bam1, String bam2) {
+		logger.info("");
+		logger.info("Getting target shift counts between " + bam1 + " and " + bam2 + "...");
 		Map<StringOrderedPair, Integer> rtrn = new TreeMap<StringOrderedPair, Integer>();
 		CloseableIterator<Collection<StringOrderedPair>> iter = new SymmetricDifferenceIterator(bam1, bam2);
+		int numDone = 0;
 		while(iter.hasNext()) {
+			numDone++;
+			if(numDone % 1000000 == 0) {
+				logger.info("Finished " + numDone + " queries");
+			}
 			Collection<StringOrderedPair> pairs = iter.next();
 			for(StringOrderedPair pair : pairs) {
 				if(!rtrn.containsKey(pair)) {
@@ -194,10 +203,16 @@ public class BamIndividualReadChangesBetweenReferences {
 		private SAMFileReader reader;
 		private SAMRecordIterator samIter;
 		private SAMRecord alreadyConsumedRecordThisCluster;
+		private long numDone;
 		
 		public QueryGroupIterator(String bamFile) {
+			numDone = 0;
 			reader =  new SAMFileReader(new File(bamFile));
 			samIter = reader.iterator();
+			SAMFileHeader header = reader.getFileHeader();
+			if(!header.getSortOrder().equals(SAMFileHeader.SortOrder.queryname)) {
+				throw new IllegalArgumentException("Bam file must be sorted by query name");
+			}
 			//samIter.assertSorted(SAMFileHeader.SortOrder.queryname);
 			if(!samIter.hasNext()) {
 				throw new IllegalStateException("SAM iterator is empty");
@@ -220,6 +235,10 @@ public class BamIndividualReadChangesBetweenReferences {
 			
 			while(samIter.hasNext()) {
 				SAMRecord next = samIter.next();
+				numDone++;
+				if(numDone % 1000000 == 0) {
+					logger.info("Finished " + numDone + " records");
+				}
 				if(next.getReadName().equals(query)) {
 					if(next.getReadUnmappedFlag()) {
 						continue;
