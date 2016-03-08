@@ -273,7 +273,6 @@ public class BamIndividualReadChangesBetweenReferences {
 		private QueryGroupIterator groupIter2;
 		private QueryWithTargets curr1;
 		private QueryWithTargets curr2;
-		private static Collection<String> queriesSeen = new HashSet<String>();
 		
 		/**
 		 * @param bam1 Bam file 1
@@ -303,10 +302,6 @@ public class BamIndividualReadChangesBetweenReferences {
 			if(curr1 == null) {
 				//logger.info("Curr1 is null");
 				String query = curr2.getQuery();
-				if(queriesSeen.contains(query)) {
-					throw new IllegalStateException("Query " + query + " has already been seen");
-				}
-				queriesSeen.add(query);
 				//logger.info("Query from curr2 is " + query);
 				Collection<StringOrderedPair> rtrn = getAllPairsOfTargetsNotInBoth(QueryWithTargets.queryWithNoTargets(query), curr2);
 				//for(StringOrderedPair pair : rtrn) logger.info(pair.toString());
@@ -316,10 +311,6 @@ public class BamIndividualReadChangesBetweenReferences {
 			if(curr2 == null) {
 				//logger.info("Curr2 is null");
 				String query = curr1.getQuery();
-				if(queriesSeen.contains(query)) {
-					throw new IllegalStateException("Query " + query + " has already been seen");
-				}
-				queriesSeen.add(query);
 				//logger.info("Query from curr1 is " + query);
 				Collection<StringOrderedPair> rtrn = getAllPairsOfTargetsNotInBoth(curr1, QueryWithTargets.queryWithNoTargets(query));
 				//for(StringOrderedPair pair : rtrn) logger.info(pair.toString());
@@ -328,14 +319,6 @@ public class BamIndividualReadChangesBetweenReferences {
 			}
 			String query1 = curr1.getQuery();
 			String query2 = curr2.getQuery();
-			if(queriesSeen.contains(query1)) {
-				throw new IllegalStateException("Query " + query1 + " has already been seen");
-			}
-			if(queriesSeen.contains(query2)) {
-				throw new IllegalStateException("Query " + query2 + " has already been seen");
-			}
-			queriesSeen.add(query1);
-			queriesSeen.add(query2);
 			int queryCompare = SAMRecordQueryNameComparator.compareReadNames(query1, query2);
 			if(queryCompare == 0) {
 				//logger.info("Query 1 (" + curr1.getQuery() + ") is equal to query 2 (" + curr2.getQuery() + ")");
