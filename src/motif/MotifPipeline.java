@@ -19,18 +19,16 @@ import org.apache.log4j.Logger;
 import org.ggf.drmaa.DrmaaException;
 import org.ggf.drmaa.Session;
 
+import util.programs.bed.BedFileCollapseOverlappers;
+import util.programs.bed.BedFileFilter;
+import util.programs.bed.WindowWriter;
 import guttmanlab.core.pipeline.Job;
 import guttmanlab.core.pipeline.JobUtils;
 import guttmanlab.core.pipeline.LSFJob;
 import guttmanlab.core.pipeline.OGSJob;
 import guttmanlab.core.pipeline.Scheduler;
-
-import annotation.WindowWriter;
-import bed.BedFileCollapseOverlappers;
-import bed.BedFileFilter;
 import broad.core.math.EmpiricalDistribution;
 import broad.pda.annotation.BEDFileParser;
-
 import nextgen.core.annotation.Gene;
 import nextgen.core.pipeline.util.OGSUtils;
 import nextgen.core.programs.FastaAnnotationExtractor;
