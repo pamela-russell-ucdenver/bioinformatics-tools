@@ -5,13 +5,18 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import org.apache.log4j.Logger;
 
 import net.sf.samtools.util.CloseableIterator;
+import guttmanlab.core.annotation.Annotation;
+import guttmanlab.core.annotation.Annotation.Strand;
 import guttmanlab.core.annotation.BEDFileRecord;
 import guttmanlab.core.annotation.BlockedAnnotation;
 import guttmanlab.core.annotation.SingleInterval;
@@ -26,6 +31,7 @@ import htsjdk.samtools.fork.SAMRecord;
 import htsjdk.samtools.fork.SAMRecordIterator;
 import htsjdk.samtools.fork.SamReader;
 import htsjdk.samtools.fork.SamReaderFactory;
+import htsjdk.samtools.fork.AlignmentBlock;
 
 /**
  * Measure proportion of reads mapping to introns and exons
@@ -34,8 +40,24 @@ import htsjdk.samtools.fork.SamReaderFactory;
  */
 public class RatioIntronGeneSpan {
 	
+	private AnnotationCollection<BEDFileRecord> transcriptome;
+	private SamReader samReader;
+	private String sampleId;
 	
-	private static class TranscriptStats {
+	private RatioIntronGeneSpan(File bamFile, File transcriptomeBed, CoordinateSpace coordSpace, String sampleId) {
+		this.sampleId = sampleId;
+		try {
+			transcriptome = BEDFileIO.loadFromFile(transcriptomeBed, coordSpace);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(-1);
+		}
+		samReader = SamReaderFactory.makeDefault().open(bamFile);
+	}
+	
+	
+	
+	private class TranscriptStats {
 		
 		private String id;
 		
@@ -70,18 +92,22 @@ public class RatioIntronGeneSpan {
 			this.geneSpan = Optional.of(Integer.valueOf(geneSpan));
 		}
 		
-		public long getIntronCount() {
-			return intronCount.get().longValue();
+		@SuppressWarnings("unused")
+		public long getIntronCountUnspliced() {
+			return intronCountUnspliced.get().longValue();
+		}
+		
+		public long getIntronCountAll() {
+			return intronCountAll.get().longValue();
 		}
 		
 		/**
-		 * Get count of reads not contained in introns PLUS
-		 * reads contained in introns that are SPLICED
+		 * Get count of reads not contained in introns
 		 * @return
 		 */
-		public Optional<Long> getCountExonPlusSpliced() {
+		public Optional<Long> getCountExons() {
 			try {
-				return Optional.of(Long.valueOf(getGeneSpanCount() - getIntronCount()));
+				return Optional.of(Long.valueOf(getGeneSpanCount() - getIntronCountAll()));
 			} catch(NoSuchElementException e) {
 				return Optional.empty();
 			}
@@ -91,45 +117,67 @@ public class RatioIntronGeneSpan {
 			return geneSpanCount.get().longValue();
 		}
 		
-		public void setIntronCount(long intronCount) {
-			this.intronCount = Optional.of(Long.valueOf(intronCount));
+		@SuppressWarnings("unused")
+		public long getGeneSpanCountMinusAllTranscribedExons() {
+			return geneSpanCountMinusAllTranscribedExons.get().longValue();
+		}
+		
+		@SuppressWarnings("unused")
+		public long getGeneSpanCountMinusAllTranscribedExonsSpliced() {
+			return geneSpanCountMinusAllTranscribedExonsSpliced.get().longValue();
+		}
+		
+		public void setIntronCountUnspliced(long intronCountUnspliced) {
+			this.intronCountUnspliced = Optional.of(Long.valueOf(intronCountUnspliced));
+		}
+		
+		public void setIntronCountAll(long intronCountAll) {
+			this.intronCountAll = Optional.of(Long.valueOf(intronCountAll));
+		}
+		
+		public void setGeneSpanCountMinusAllTranscribedExons(long geneSpanCountMinusAllTranscribedExons) {
+			this.geneSpanCountMinusAllTranscribedExons = Optional.of(Long.valueOf(geneSpanCountMinusAllTranscribedExons));
+		}
+		
+		public void setGeneSpanCountMinusAllTranscribedExonsSpliced(long geneSpanCountMinusAllTranscribedExonsSpliced) {
+			this.geneSpanCountMinusAllTranscribedExonsSpliced = Optional.of(Long.valueOf(geneSpanCountMinusAllTranscribedExonsSpliced));
 		}
 		
 		public void setGeneSpanCount(long geneSpanCount) {
 			this.geneSpanCount = Optional.of(Long.valueOf(geneSpanCount));
 		}
 		
-		
-		public Optional<Float> getProportionOfReadsFromExons() {
-			Optional<Float> introns = getProportionOfReadsFromIntrons();
-			if(introns.isPresent()) return Optional.of(Float.valueOf(1 - introns.get().floatValue()));
-			return Optional.empty();
-		}
-		
-		public Optional<Float> getProportionOfReadsFromIntrons() {
-			if(intronCount.isPresent() && geneSpanCount.isPresent()) {
+				
+		public Optional<Float> getProportionOfReads(Optional<Long> count) {
+			if(count.isPresent() && geneSpanCount.isPresent()) {
 				long g = geneSpanCount.get();
-				long e = intronCount.get();
+				long e = count.get();
 				if(g != 0) return Optional.of(Float.valueOf((float)e / g));
 				else return Optional.empty();
 			}
 			throw new NoSuchElementException();
 		}
 		
-		public static final String columnHeaders() {
-			return 	"transcript_id\t"
-					+"gene_span_length\t"
-					+ "num_exons\t"
-					+ "total_length_of_exons\t"
-					+ "total_count_over_gene_span\t"
-					+ "total_count_over_exons_plus_all_spliced\t"
-					+ "total_count_over_introns\t"
-					+ "proportion_exons\t"
-					+ "proportion_introns\t";
-		}
-		
+		public static final String columnHeaders =
+				"sample_id\t"
+				+ "transcript_id\t"
+				+"gene_span_length\t"
+				+ "num_exons\t"
+				+ "total_length_of_exons\t"
+				+ "total_count_over_gene_span\t"
+				+ "total_count_over_exons\t"
+				+ "total_count_over_introns\t"
+				+ "total_count_over_introns_unspliced\t"
+				+ "total_count_over_gene_span_minus_all_exons\t"
+				+ "total_count_over_gene_span_minus_all_exons_spliced\t"
+				+ "proportion_exons\t"
+				+ "proportion_introns\t"
+				+ "proportion_introns_unspliced\t";
+	
+
 		public String toString() {
-			String rtrn = id + "\t";
+			String rtrn = sampleId + "\t";
+			rtrn += id + "\t";
 			if(geneSpan.isPresent()) rtrn += geneSpan.get() + "\t";
 			else rtrn += "-\t";
 			if(numExons.isPresent()) rtrn += numExons.get() + "\t";
@@ -138,37 +186,48 @@ public class RatioIntronGeneSpan {
 			else rtrn += "-\t";
 			if(geneSpanCount.isPresent()) rtrn += geneSpanCount.get() + "\t";
 			else rtrn += "-\t";
-			if(getCountExonPlusSpliced().isPresent()) rtrn += getCountExonPlusSpliced().get() + "\t";
+			if(getCountExons().isPresent()) rtrn += getCountExons().get() + "\t";
 			else rtrn += "-\t";
-			if(intronCount.isPresent()) rtrn += intronCount.get() + "\t";
+			if(intronCountAll.isPresent()) rtrn += intronCountAll.get() + "\t";
+			else rtrn += "-\t";
+			if(intronCountUnspliced.isPresent()) rtrn += intronCountUnspliced.get() + "\t";
+			else rtrn += "-\t";
+			if(geneSpanCountMinusAllTranscribedExons.isPresent()) rtrn += geneSpanCountMinusAllTranscribedExons.get() + "\t";
+			else rtrn += "-\t";
+			if(geneSpanCountMinusAllTranscribedExonsSpliced.isPresent()) rtrn += geneSpanCountMinusAllTranscribedExonsSpliced.get() + "\t";
 			else rtrn += "-\t";
 			try {
-				rtrn += getProportionOfReadsFromExons().get() + "\t";
-				rtrn += getProportionOfReadsFromIntrons().get() + "\t";
+				rtrn += getProportionOfReads(getCountExons()).get() + "\t";
+				rtrn += getProportionOfReads(intronCountAll).get() + "\t";
+				rtrn += getProportionOfReads(intronCountUnspliced).get() + "\t";
 			} catch(NoSuchElementException e) {
 				rtrn += "-\t-\t";
 			}
 			return rtrn;
 		}
 		
+
 		private Optional<Integer> numExons;
 		private Optional<Integer> totalExonSize;
 		private Optional<Integer> geneSpan;
-		private Optional<Long> intronCount;
+		private Optional<Long> intronCountUnspliced;
+		private Optional<Long> intronCountAll;
 		private Optional<Long> geneSpanCount;
+		private Optional<Long> geneSpanCountMinusAllTranscribedExons;
+		private Optional<Long> geneSpanCountMinusAllTranscribedExonsSpliced;
 		
 	}
 	
 	private static Logger logger = Logger.getLogger(RatioIntronGeneSpan.class.getName());
 	
 	/**
-	 * Get count of UNSPLICED reads that are FULLY CONTAINED in introns
+	 * Get count of reads that are FULLY CONTAINED in introns
 	 * @param transcript Transcript
-	 * @param samReader SAM reader
-	 * @return Count of UNSPLICED reads that are FULLY CONTAINED in introns.
+	 * @param unsplicedOnly Unspliced reads only
+	 * @return Count of reads that are FULLY CONTAINED in introns.
 	 * Spliced reads that are nevertheless contained in the intron are NOT COUNTED.
 	 */
-	private static long getTotalCountOverIntrons(BlockedAnnotation transcript, SamReader samReader) {
+	private long getTotalCountOverIntrons(BlockedAnnotation transcript, boolean unsplicedOnly) {
 		String chr = transcript.getReferenceName();
 		Collection<SingleInterval> introns = new ArrayList<SingleInterval>();
 		Iterator<SingleInterval> blockIter = transcript.getBlocks();
@@ -181,33 +240,46 @@ public class RatioIntronGeneSpan {
 		}
 		return introns
 				.stream()
-				.mapToLong(block -> getCount(chr, block.getReferenceStartPosition(), block.getReferenceEndPosition(), samReader, true))
+				.mapToLong(block -> getCount(chr, block.getReferenceStartPosition(), block.getReferenceEndPosition(), 
+						unsplicedOnly ? Collections.singleton(isSpliced) : Collections.emptySet()))
 				.sum();
 	}
 	
-	private static long getCount(String chr, int start, int end, SamReader samReader, boolean unsplicedOnly) {
+	
+
+	private long getCount(String chr, int start, int end,
+			Collection<Predicate<SAMRecord>> removeIfTrue) {
 		SAMRecordIterator iter = samReader.queryContained(chr, start, end);
 		long rtrn = 0;
 		while(iter.hasNext()) {
 			SAMRecord record = iter.next();
-			if(unsplicedOnly) {
-				Iterator<CigarElement> cigarIter = record.getCigar().iterator();
-				int numBlocks = 0;
-				while(cigarIter.hasNext()) {
-					if(cigarIter.next().getOperator().equals(CigarOperator.M)) {numBlocks++;}
+			boolean passesFilters = true;
+			for(Predicate<SAMRecord> predicate : removeIfTrue) {
+				if(predicate.test(record)) {
+					passesFilters = false;
+					break;
 				}
-				if(numBlocks > 1) continue;
 			}
-			if(!record.getReadUnmappedFlag()) rtrn++;
+			if(passesFilters) rtrn++;
 		}
 		iter.close();
-		//if(rtrn > 0) logger.info("COUNT\tunspliced_only:" + unsplicedOnly + "\t" + chr + ":" + start + "-" + end + "\t" + rtrn);
 		return rtrn;
 	}
+		
+	private static final Predicate<SAMRecord> isSpliced = (record -> {
+		Iterator<CigarElement> cigarIter = record.getCigar().iterator();
+		int numBlocks = 0;
+		while(cigarIter.hasNext()) {
+			if(cigarIter.next().getOperator().equals(CigarOperator.M)) {numBlocks++;}
+		}
+		return numBlocks > 1;
+	});
 	
-	private static long getCountOverGeneSpan(BlockedAnnotation transcript, SamReader samReader) {
+	private static final Predicate<SAMRecord> isNotSpliced = (record -> !isSpliced.test(record));
+	
+	private long getCountOverGeneSpan(BlockedAnnotation transcript) {
 		return getCount(transcript.getReferenceName(), transcript.getReferenceStartPosition(), 
-				transcript.getReferenceEndPosition(), samReader, false);
+				transcript.getReferenceEndPosition(), Collections.emptySet());
 	}
 	
 	private static int getTotalSizeOfExons(BlockedAnnotation transcript) {
@@ -216,19 +288,49 @@ public class RatioIntronGeneSpan {
 				.sum();
 	}
 	
-	private static TranscriptStats getTranscriptStats(BlockedAnnotation transcript, SamReader samReader) {
+	private static Predicate<SAMRecord> overlapsAnyExon(AnnotationCollection<? extends Annotation> transcripts) {
+		return (record -> {
+			List<AlignmentBlock> blocks = record.getAlignmentBlocks();
+			for(AlignmentBlock block : blocks) {
+				SingleInterval blockInterval = new SingleInterval(record.getReferenceName(),
+						block.getReferenceStart(), block.getReferenceStart() + block.getLength(), Strand.BOTH);
+				if(transcripts.overlaps(blockInterval)) return true;
+			}
+			return false;
+		});
+	}
+	
+	private long getGeneSpanCountMinusExonOverlappers(Annotation transcript) {
+		return getCount(transcript.getReferenceName(), transcript.getReferenceStartPosition(),
+				transcript.getReferenceEndPosition(), 
+				Collections.singleton(overlapsAnyExon(transcriptome)));
+	}
+
+	private long getGeneSpanCountMinusExonOverlappersSpliced(Annotation transcript) {
+		Collection<Predicate<SAMRecord>> predicates = new ArrayList<Predicate<SAMRecord>>();
+		predicates.add(overlapsAnyExon(transcriptome));
+		predicates.add(isNotSpliced);
+		return getCount(transcript.getReferenceName(), transcript.getReferenceStartPosition(),
+				transcript.getReferenceEndPosition(), 
+				predicates);
+	}
+	
+	private TranscriptStats getTranscriptStats(BlockedAnnotation transcript) {
 		TranscriptStats rtrn = new TranscriptStats(transcript.getName());
-		rtrn.setIntronCount(getTotalCountOverIntrons(transcript, samReader));
+		rtrn.setIntronCountAll(getTotalCountOverIntrons(transcript, false));
+		rtrn.setIntronCountUnspliced(getTotalCountOverIntrons(transcript, true));
 		rtrn.setGeneSpan(transcript.getReferenceEndPosition() - transcript.getReferenceStartPosition());
-		rtrn.setGeneSpanCount(getCountOverGeneSpan(transcript, samReader));
+		rtrn.setGeneSpanCount(getCountOverGeneSpan(transcript));
 		rtrn.setNumExons(transcript.getNumberOfBlocks());
 		rtrn.setTotalExonSize(getTotalSizeOfExons(transcript));
+		rtrn.setGeneSpanCountMinusAllTranscribedExons(getGeneSpanCountMinusExonOverlappers(transcript));
+		rtrn.setGeneSpanCountMinusAllTranscribedExonsSpliced(getGeneSpanCountMinusExonOverlappersSpliced(transcript));
 		return rtrn;
 	}
 	
-	private static void writeTranscriptStats(BlockedAnnotation transcript, SamReader samReader, FileWriter writer) {
+	private void writeTranscriptStats(BlockedAnnotation transcript, FileWriter writer) {
 		try {
-			TranscriptStats stats = getTranscriptStats(transcript, samReader);
+			TranscriptStats stats = getTranscriptStats(transcript);
 			if(stats.getGeneSpanCount() == 0) return;
 			writer.write(stats.toString() + "\n");
 		} catch (IOException e) {
@@ -237,26 +339,22 @@ public class RatioIntronGeneSpan {
 		}
 	}
 	
-	private static void writeTranscriptStats(AnnotationCollection<? extends BlockedAnnotation> transcripts,
-			SamReader samReader, FileWriter writer) {
-		CountLogger countLogger = new CountLogger(transcripts.getNumAnnotations(), 10);
-		CloseableIterator<? extends BlockedAnnotation> iter = transcripts.sortedIterator();
+	private void writeTranscriptStats(FileWriter writer) {
+		CountLogger countLogger = new CountLogger(transcriptome.getNumAnnotations(), 10);
+		CloseableIterator<? extends BlockedAnnotation> iter = transcriptome.sortedIterator();
 		while(iter.hasNext()) {
 			countLogger.advance();
-			writeTranscriptStats(iter.next(), samReader, writer);
+			writeTranscriptStats(iter.next(), writer);
 		}
 		iter.close();
 	}
 	
-	private static void writeTranscriptStats(File bedFile, CoordinateSpace coordSpace, File bamFile, File outputTable) {
+	private void writeTranscriptStats(File outputTable) {
 		try {
-			AnnotationCollection<BEDFileRecord> transcripts = BEDFileIO.loadFromFile(bedFile, coordSpace);
 			FileWriter writer = new FileWriter(outputTable);
-			SamReader samReader = SamReaderFactory.makeDefault().open(bamFile);
-			writer.write(TranscriptStats.columnHeaders() + "\n");
-			writeTranscriptStats(transcripts, samReader, writer);
+			writer.write(TranscriptStats.columnHeaders + "\n");
+			writeTranscriptStats(writer);
 			writer.close();
-			samReader.close();
 		} catch(IOException e) {
 			e.printStackTrace();
 			System.exit(-1);
@@ -270,13 +368,21 @@ public class RatioIntronGeneSpan {
 		p.addStringArg("-t", "Bed file", true);
 		p.addStringArg("-c", "Chromosome size file", true);
 		p.addStringArg("-o", "Output table", true);
+		p.addStringArg("-s", "Sample ID", true);
 		p.parse(args);
 		File bedFile = new File(p.getStringArg("-t"));
 		CoordinateSpace coordSpace = new CoordinateSpace(p.getStringArg("-c"));
 		File bamFile = new File(p.getStringArg("-b"));
 		File output = new File(p.getStringArg("-o"));
+		String sampleId = p.getStringArg("-s");
 		
-		writeTranscriptStats(bedFile, coordSpace, bamFile, output);
+		RatioIntronGeneSpan r = new RatioIntronGeneSpan(bamFile, bedFile, coordSpace, sampleId);
+		r.writeTranscriptStats(output);
+		try {
+			r.samReader.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		
 		logger.info("");
 		logger.info("All done");
