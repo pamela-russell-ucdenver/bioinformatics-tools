@@ -22,6 +22,7 @@ import guttmanlab.core.annotation.BlockedAnnotation;
 import guttmanlab.core.annotation.SingleInterval;
 import guttmanlab.core.annotation.io.BEDFileIO;
 import guttmanlab.core.annotationcollection.AnnotationCollection;
+import guttmanlab.core.annotationcollection.FeatureCollection;
 import guttmanlab.core.coordinatespace.CoordinateSpace;
 import guttmanlab.core.util.CommandLineParser;
 import guttmanlab.core.util.CountLogger;
@@ -41,21 +42,99 @@ import htsjdk.samtools.fork.AlignmentBlock;
 public class RatioIntronGeneSpan {
 	
 	private AnnotationCollection<BEDFileRecord> transcriptome;
-	private SamReader samReader;
+	private FeatureCollection<SingleInterval> geneSpans;
+	private File bamFile;
 	private String sampleId;
 	
 	private RatioIntronGeneSpan(File bamFile, File transcriptomeBed, CoordinateSpace coordSpace, String sampleId) {
 		this.sampleId = sampleId;
 		try {
 			transcriptome = BEDFileIO.loadFromFile(transcriptomeBed, coordSpace);
+			geneSpans = new FeatureCollection<SingleInterval>(coordSpace);
+			CloseableIterator<BEDFileRecord> geneIter = transcriptome.sortedIterator();
+			while(geneIter.hasNext()) {
+				BEDFileRecord gene = geneIter.next();
+				geneSpans.add(new SingleInterval(gene.getReferenceName(), gene.getReferenceStartPosition(), 
+						gene.getReferenceEndPosition()));
+			}
+			geneIter.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(-1);
 		}
-		samReader = SamReaderFactory.makeDefault().open(bamFile);
+		this.bamFile = bamFile;
 	}
 	
-	
+	private class OverallStats {
+		
+		private long geneSpanCount;
+		private long noExonOverlapCount;
+		private long noExonOverlapCountSpliced;
+		private Predicate<SAMRecord> geneSpanOverlap;
+		private Predicate<SAMRecord> exonOverlap;
+		
+		public OverallStats() {
+			geneSpanCount = 0;
+			noExonOverlapCount = 0;
+			noExonOverlapCountSpliced = 0;
+			geneSpanOverlap = overlapsAnyExon(geneSpans);
+			exonOverlap = overlapsAnyExon(transcriptome);
+			calculate();
+		}
+		
+		private void calculate() {
+			SamReader samReader = SamReaderFactory.makeDefault().open(bamFile);
+			SAMRecordIterator iter = samReader.iterator();
+			while(iter.hasNext()) {
+				update(iter.next());
+			}
+			iter.close();
+		}
+		
+		private void update(SAMRecord record) {
+			if(geneSpanOverlap.test(record)) {
+				geneSpanCount++;
+				if(!exonOverlap.test(record)) {
+					noExonOverlapCount++;
+					if(isSpliced.test(record)) {
+						noExonOverlapCountSpliced++;
+					}
+				}
+			}
+		}
+		
+		/**
+		 * @return Number of reads in bam file that overlap a gene span
+		 */
+		@SuppressWarnings("unused")
+		public long getGeneSpanCount() {
+			return geneSpanCount;
+		}
+		
+		/**
+		 * @return Number of reads in bam file that overlap a gene span but no exons
+		 */
+		@SuppressWarnings("unused")
+		public long getNoExonOverlapCount() {
+			return noExonOverlapCount;
+		}
+		
+		/**
+		 * @return Number of reads in bam file that overlap a gene span but no exons, and are spliced
+		 */
+		@SuppressWarnings("unused")
+		public long getNoExonOverlapCountSpliced() {
+			return noExonOverlapCountSpliced;
+		}
+		
+		public String toString() {
+			String rtrn = "gene_span\t" + geneSpanCount + "\n";
+			rtrn += "no_exon_overlap\t" + noExonOverlapCount + "\n";
+			rtrn += "no_exon_overlap_spliced\t" + noExonOverlapCountSpliced + "\n";
+			return rtrn;
+		}
+		
+	}
 	
 	private class TranscriptStats {
 		
@@ -249,6 +328,7 @@ public class RatioIntronGeneSpan {
 
 	private long getCount(String chr, int start, int end,
 			Collection<Predicate<SAMRecord>> removeIfTrue) {
+		SamReader samReader = SamReaderFactory.makeDefault().open(bamFile);
 		SAMRecordIterator iter = samReader.queryContained(chr, start, end);
 		long rtrn = 0;
 		while(iter.hasNext()) {
@@ -263,16 +343,20 @@ public class RatioIntronGeneSpan {
 			if(passesFilters) rtrn++;
 		}
 		iter.close();
+		try {
+			samReader.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		return rtrn;
 	}
 		
 	private static final Predicate<SAMRecord> isSpliced = (record -> {
 		Iterator<CigarElement> cigarIter = record.getCigar().iterator();
-		int numBlocks = 0;
 		while(cigarIter.hasNext()) {
-			if(cigarIter.next().getOperator().equals(CigarOperator.M)) {numBlocks++;}
+			if(cigarIter.next().getOperator().equals(CigarOperator.N)) {return true;}
 		}
-		return numBlocks > 1;
+		return false;
 	});
 	
 	private static final Predicate<SAMRecord> isNotSpliced = (record -> !isSpliced.test(record));
@@ -361,29 +445,48 @@ public class RatioIntronGeneSpan {
 		}
 	}
 	
+	private void writeReadBreakdown(File outfile) {
+		try {
+			FileWriter w = new FileWriter(outfile);
+			OverallStats os = new OverallStats();
+			w.write(os.toString());
+			w.close();
+		} catch(IOException e) {
+			e.printStackTrace();
+			System.exit(-1);
+		}
+	}
+	
 	public static void main(String[] args) {
 		
 		CommandLineParser p = new CommandLineParser();
 		p.addStringArg("-b", "Bam file", true);
 		p.addStringArg("-t", "Bed file", true);
 		p.addStringArg("-c", "Chromosome size file", true);
-		p.addStringArg("-o", "Output table", true);
+		p.addStringArg("-ots", "Output table of transcript stats", false, null);
+		p.addStringArg("-orb", "Output file of read breakdown exonic/intronic", false, null);
 		p.addStringArg("-s", "Sample ID", true);
 		p.parse(args);
 		File bedFile = new File(p.getStringArg("-t"));
 		CoordinateSpace coordSpace = new CoordinateSpace(p.getStringArg("-c"));
 		File bamFile = new File(p.getStringArg("-b"));
-		File output = new File(p.getStringArg("-o"));
 		String sampleId = p.getStringArg("-s");
 		
 		RatioIntronGeneSpan r = new RatioIntronGeneSpan(bamFile, bedFile, coordSpace, sampleId);
-		r.writeTranscriptStats(output);
-		try {
-			r.samReader.close();
-		} catch (IOException e) {
-			e.printStackTrace();
+		
+		String outTranscriptStats = p.getStringArg("-ots");
+		String outReadBreakdown = p.getStringArg("-orb");
+		
+		if(outTranscriptStats != null) {
+			File output = new File(outTranscriptStats);
+			r.writeTranscriptStats(output);
 		}
 		
+		if(outReadBreakdown != null) {
+			File output = new File(outReadBreakdown);
+			r.writeReadBreakdown(output);
+		}
+				
 		logger.info("");
 		logger.info("All done");
 		
